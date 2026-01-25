@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id              String   @id @default(uuid())
+  name            String
+  code            String?
+  email           String?
+  website         String?
+  contactPerson   String?
+  chatworkGroup   String?
+  
+  billingContactId String?
+  billingContact   Partner? @relation("ClientBillingContact", fields: [billingContactId], references: [id])
+  
+  sns1            String?
+  sns2            String?
+  sns3            String?
+
+  pricingRules    PricingRule[] @relation("ClientPricingRules")
+  invoices        Invoice[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Partner {
+  id            String   @id @default(uuid())
+  name          String
+  role          String
+  email         String?
+  chatworkGroup String?
+  
+  costRules     PricingRule[] @relation("PartnerCostRules")
+  outsources    Outsource[]
+  billingClients Client[] @relation("ClientBillingContact")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Supervisor {
+  id        String    @id @default(uuid())
+  name      String
+  email     String?
+  
+  invoices  Invoice[]
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model PricingRule {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  type        String   // FIXED, STEPPED, LINEAR
+  
+  // For FIXED type
+  fixedPrice  Float?
+  
+  // For STEPPED type (stored as JSON)
+  steps       String?  // JSON: [{ upTo: number, price: number }]
+  
+  // For LINEAR type
+  incrementalUnit      Float?
+  incrementalUnitPrice Float?
+  incrementThreshold   Float?
+  
+  // Relations - M:N
+  clients     Client[]  @relation("ClientPricingRules")
+  partners    Partner[] @relation("PartnerCostRules")
+  
+  isDefault   Boolean  @default(false)
+  
+  invoiceItems InvoiceItem[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Invoice {
+  id                  String   @id @default(uuid())
+  
+  clientId            String
+  client              Client   @relation(fields: [clientId], references: [id])
+  
+  supervisorId        String?
+  supervisor          Supervisor? @relation(fields: [supervisorId], references: [id])
+  
+  issueDate           DateTime? 
+  dueDate             DateTime?
+  status              String   @default("DRAFT")
+  
+  communicationChannel String?
+
+  subtotal            Float @default(0)
+  tax                 Float @default(0)
+  totalAmount         Float @default(0)
+  totalCost           Float @default(0)
+  profit              Float @default(0)
+  profitMargin        Float @default(0)
+  
+  items               InvoiceItem[]
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model InvoiceItem {
+  id                String   @id @default(uuid())
+  
+  invoiceId         String
+  invoice           Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  name              String
+  duration          Float?
+  quantity          Int      @default(1)
+  unitPrice         Float    @default(0)
+  amount            Float    @default(0)
+  
+  pricingRuleId     String?
+  pricingRule       PricingRule? @relation(fields: [pricingRuleId], references: [id])
+  
+  outsources        Outsource[]
+  
+  productionStatus  String   @default("Pre-Order")
+  deliveryDate      DateTime?
+  deliveryUrl       String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Outsource {
+  id                String   @id @default(uuid())
+  
+  invoiceItemId     String
+  invoiceItem       InvoiceItem @relation(fields: [invoiceItemId], references: [id], onDelete: Cascade)
+  
+  partnerId         String
+  partner           Partner     @relation(fields: [partnerId], references: [id])
+  
+  amount            Float       @default(0)
+  description       String?
+  status            String      @default("Pending") // 未発注, 発注済, 完了, 支払済
+  deliveryUrl       String?
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}

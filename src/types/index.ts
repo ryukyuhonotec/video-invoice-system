@@ -7,21 +7,20 @@ export interface PricingStep {
 
 export interface PricingRule {
     id: string;
-    name: string; // e.g., "Pattern A Fee"
+    name: string;
     description?: string;
     type: PricingType;
 
-    // For fixed items (e.g., "Base Management Fee")
     fixedPrice?: number;
+    steps?: string | PricingStep[];
 
-    // For stepped (e.g., 0-1min: 10000, 1-2min: 20000)
-    steps?: PricingStep[];
-
-    // For incremental logic (e.g., After 3min, +5000 per 1min)
-    // Can be combined with steps: Steps define 0-3min, then this applies
-    incrementalUnit?: number; // per X minutes
+    incrementalUnit?: number;
     incrementalUnitPrice?: number;
-    incrementThreshold?: number; // Applies after this duration
+    incrementThreshold?: number;
+
+    clients?: Client[];
+    partners?: Partner[];
+    isDefault: boolean;
 }
 
 export interface Client {
@@ -29,19 +28,41 @@ export interface Client {
     name: string;
     code?: string;
     email?: string;
-    defaultPricingRules?: string[]; // IDs of PricingRules applicable to this client
-}
-
-export interface PartnerCostRule extends PricingRule {
-    partnerId: string;
-    clientId?: string; // If set, only applies to this client
+    chatworkGroup?: string;
+    billingContact?: string;
+    website?: string;
+    contactPerson?: string;
+    sns1?: string;
+    sns2?: string;
+    sns3?: string;
+    pricingRules?: PricingRule[];
 }
 
 export interface Partner {
     id: string;
     name: string;
-    role: string; // Cameraman, Editor, etc.
-    costRules?: PartnerCostRule[];
+    role: string;
+    email?: string;
+    chatworkGroup?: string;
+    costRules?: PricingRule[];
+    outsources?: Outsource[];
+}
+
+export interface Outsource {
+    id: string;
+    invoiceItemId: string;
+    partnerId: string;
+    partner?: Partner;
+    amount: number;
+    description?: string;
+    status: string; // 未発注, 発注済, 完了, 支払済
+    deliveryUrl?: string;
+}
+
+export interface Supervisor {
+    id: string;
+    name: string;
+    email?: string;
 }
 
 export type InvoiceStatus = 'DRAFT' | 'Unbilled' | 'Billed' | 'Paid';
@@ -50,27 +71,30 @@ export type ProductionStatus = 'Pre-Order' | 'In Progress' | 'Review' | 'Deliver
 export interface InvoiceItem {
     id: string;
     invoiceId: string;
-    name: string; // Item name, e.g. "Product Video - Pattern A"
-    pricingRuleId?: string; // which rule determined the price
+    name: string;
+    pricingRuleId?: string;
+    pricingRule?: PricingRule;
 
-    duration?: number; // in minutes, user input
+    duration?: number;
     quantity: number;
 
-    unitPrice: number; // calculated or manual
-    amount: number; // unitPrice * quantity
+    unitPrice: number;
+    amount: number;
 
-    assignedPartnerId?: string; // Partner doing the work
-    cost?: number; // Associated cost (external)
+    outsources: Outsource[];
 
     productionStatus: ProductionStatus;
-    deliveryDate?: string; // ISO Date YYYY-MM-DD
+    deliveryDate?: string;
+    deliveryUrl?: string;
 }
 
 export interface Invoice {
     id: string;
     clientId: string;
-    issueDate: string; // YYYY-MM-DD
-    dueDate?: string; // YYYY-MM-DD
+    supervisorId?: string;
+    communicationChannel?: string;
+    issueDate: string;
+    dueDate?: string;
     status: InvoiceStatus;
     items: InvoiceItem[];
 

@@ -1,4 +1,4 @@
-import { Client, Invoice, PricingRule, Partner } from "@/types";
+import { Client, Invoice, PricingRule, Partner, Supervisor } from "@/types";
 
 export const MOCK_PRICING_RULES: PricingRule[] = [
     {
@@ -14,6 +14,7 @@ export const MOCK_PRICING_RULES: PricingRule[] = [
         incrementThreshold: 3,
         incrementalUnit: 1,
         incrementalUnitPrice: 5000,
+        isDefault: true,
     },
     {
         id: "rule-shorts",
@@ -21,12 +22,14 @@ export const MOCK_PRICING_RULES: PricingRule[] = [
         type: "FIXED",
         fixedPrice: 8000,
         description: "Fixed price for any video under 1 minute",
+        isDefault: false,
     },
     {
         id: "rule-fixed-mng",
         name: "ディレクション費 (Fixed)",
         type: "FIXED",
         fixedPrice: 30000,
+        isDefault: false,
     }
 ];
 
@@ -34,12 +37,11 @@ export const MOCK_CLIENTS: Client[] = [
     {
         id: "client-a",
         name: "株式会社ClientA",
-        defaultPricingRules: ["rule-standard-video", "rule-fixed-mng"],
+        billingContact: "経理 佐藤様",
     },
     {
         id: "client-b",
         name: "合同会社ClientB",
-        defaultPricingRules: ["rule-shorts"],
     }
 ];
 
@@ -48,48 +50,31 @@ export const MOCK_PARTNERS: Partner[] = [
         id: "p-001",
         name: "山田 太郎",
         role: "カメラマン",
-        costRules: [
-            {
-                id: "cost-p001-std",
-                partnerId: "p-001",
-                name: "標準撮影費用",
-                type: "FIXED",
-                fixedPrice: 15000 // Base cost
-            },
-            {
-                id: "cost-p001-clientA",
-                partnerId: "p-001",
-                clientId: "client-a", // Special rate for Client A
-                name: "Client A 特別撮影費",
-                type: "FIXED",
-                fixedPrice: 12000
-            }
-        ]
+        email: "yamada@example.com",
+        chatworkGroup: "https://www.chatwork.com/g/example-group-1",
     },
     {
         id: "p-002",
         name: "鈴木 花子",
         role: "エディター",
-        costRules: [
-            {
-                id: "cost-p002-std",
-                partnerId: "p-002",
-                name: "標準編集費用",
-                type: "STEPPED",
-                steps: [
-                    { upTo: 5, price: 5000 },
-                    { upTo: 10, price: 8000 }
-                ]
-            }
-        ]
+        email: "suzuki@example.com",
+        chatworkGroup: "https://www.chatwork.com/g/example-group-2",
     },
-    { id: "p-003", name: "佐藤 次郎", role: "ディレクター" },
+    { id: "p-003", name: "佐藤 次郎", role: "ディレクター", email: "sato@example.com" },
+    { id: "p-004", name: "高橋 経理", role: "経理", email: "takahashi@example.com", chatworkGroup: "https://www.chatwork.com/g/accounting" },
+];
+
+export const MOCK_SUPERVISORS: Supervisor[] = [
+    { id: "s-001", name: "田中 統括" },
+    { id: "s-002", name: "山本 マネージャー" }
 ];
 
 export const MOCK_INVOICES: Invoice[] = [
     {
         id: "inv-001",
         clientId: "client-a",
+        supervisorId: "s-001",
+        communicationChannel: "https://slack.com/archives/C12345678",
         issueDate: "2024-05-01",
         status: "Unbilled",
         subtotal: 0,
@@ -110,7 +95,15 @@ export const MOCK_INVOICES: Invoice[] = [
                 amount: 0,
                 productionStatus: "In Progress",
                 deliveryDate: "2024-05-20",
-                assignedPartnerId: "p-001"
+                outsources: [
+                    {
+                        id: "o-1",
+                        invoiceItemId: "item-1",
+                        partnerId: "p-001",
+                        amount: 15000,
+                        status: "Ordered"
+                    }
+                ]
             }
         ]
     }
