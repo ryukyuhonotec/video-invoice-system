@@ -1,158 +1,70 @@
-# 動画制作案件管理システム (Video Production Invoice System)
+# Video Production Invoice System (制作進行・請求管理システム)
 
-動画制作会社向けの案件管理・見積・請求書作成システムです。クライアント管理、パートナー管理、料金ルール設定、複数外注先への発注管理を一元化し、利益計算を自動化します。
+動画制作事業に特化した、案件進行管理と請求書作成を統合したシステムです。
+Next.js (App Router) と Prisma (SQLite) を使用して構築されています。
 
-## 🎯 主要機能
+## <span class="emoji">🚀</span> 機能概要
 
-### ✅ 実装済み機能
+### 1. 案件・制作進行管理
+- **ダッシュボード**: 進行中の案件、納期、担当者を一覧表示。
+- **ステータス管理**: Pre-Order, InProgress, Review, Delivered, Paid などのステータスで進捗を可視化。
+- **発注管理**: 1つの品目に対し、複数のパートナー（エディター、ナレーター、ディレクターなど）をアサインし、個別の発注金額を管理可能。
 
-- **クライアント管理**: 取引先企業の情報管理（連絡先、SNS、Chatworkグループ等）
-- **パートナー管理**: 外注先（エディター、ディレクター、経理等）の管理
-- **料金ルール管理**: 
-  - 固定料金・段階料金・増分料金の3パターンに対応
-  - **多対多（M:N）関係**: 1つのルールを複数のクライアント・パートナーに適用可能
-- **案件作成・編集**:
-  - 品目ごとに複数の外注先をアサイン可能
-  - リアルタイムで売上・原価・利益を自動計算
-  - 制作ステータス管理（発注前・制作中・レビュー中・納品済み）
-- **ダッシュボード**: 進行中案件の一覧表示とフィルタリング（クライアント・統括・担当者別）
-- **データベース統合**: Prisma + SQLite による永続化
+### 2. クライアント・パートナー管理
+- **クライアント管理**: 会社情報、担当者、適用される料金ルールの管理。
+- **パートナー管理**: クリエイター情報の管理、役割（Role）の設定。
 
-### 🚧 今後の実装予定
+### 3. 計算ロジック・料金ルール
+- **料金ルール (Pricing Rules)**: クライアントごとに異なる単価設定や計算ロジック（固定、ステップ、増減）を定義し、適用可能。
+- **自動計算**: ルールに基づいた売上、外注費、粗利のリアルタイム計算。
 
-- エンドツーエンドのブラウザテスト自動化
-- 請求書PDF出力機能
-- 売上・利益レポート機能
-- ユーザー認証・権限管理
+## <span class="emoji">🛠️</span> 技術スタック
 
-## 🛠 技術スタック
+- **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
+- **Language**: TypeScript
+- **Database**: SQLite (via Prisma ORM)
+- **UI Components**: [shadcn/ui](https://ui.shadcn.com/) + Tailwind CSS
+- **Server Actions**: バックエンドロジックの統合
 
-- **フレームワーク**: [Next.js 16](https://nextjs.org/) (App Router)
-- **言語**: TypeScript
-- **データベース**: SQLite (開発環境) / Prisma ORM
-- **UI**: React + Tailwind CSS
-- **状態管理**: React Hooks (useState, useEffect)
-- **バリデーション**: クライアントサイドバリデーション
+## <span class="emoji">⚙️</span> 環境構築 (Setup)
 
-## 📦 セットアップ
-
-### 前提条件
-
-- Node.js 18.x 以上
-- npm または yarn
-
-### インストール
-
+### 1. リポジトリのクローン
 ```bash
-# リポジトリのクローン
 git clone https://github.com/ryukyuhonotec/video-invoice-system.git
 cd video-invoice-system
-
-# 依存関係のインストール
-npm install
-
-# 環境変数の設定
-echo 'DATABASE_URL="file:/absolute/path/to/video-invoice-system/prisma/dev.db"' > .env
-
-# データベースのマイグレーション
-npx prisma db push
-npx prisma generate
-
-# 開発サーバーの起動
-npm run dev
 ```
 
-ブラウザで [http://localhost:3000](http://localhost:3000) を開いてください。
-
-## 📁 プロジェクト構成
-
-```
-video-invoice-system/
-├── prisma/
-│   ├── schema.prisma          # データベーススキーマ定義
-│   └── dev.db                 # SQLiteデータベース（開発用）
-├── src/
-│   ├── actions/
-│   │   └── pricing-actions.ts # Server Actions（CRUD操作）
-│   ├── app/
-│   │   ├── page.tsx           # ダッシュボード
-│   │   ├── clients/           # クライアント管理ページ
-│   │   ├── partners/          # パートナー管理ページ
-│   │   ├── pricing-rules/     # 料金ルール管理ページ
-│   │   └── invoices/
-│   │       ├── new/           # 新規案件作成
-│   │       └── [id]/          # 案件編集
-│   ├── components/
-│   │   ├── InvoiceForm.tsx    # 案件作成・編集フォーム
-│   │   └── ui/                # 共通UIコンポーネント
-│   ├── lib/
-│   │   ├── db.ts              # Prismaクライアント
-│   │   └── pricing.ts         # 料金計算ロジック
-│   ├── types/
-│   │   └── index.ts           # TypeScript型定義
-│   └── data/
-│       └── mock.ts            # モックデータ（開発用）
-├── .env                       # 環境変数
-└── package.json
-```
-
-## 🗄 データモデル
-
-### 主要エンティティ
-
-- **Client**: クライアント企業
-- **Partner**: 外注パートナー
-- **PricingRule**: 料金ルール（M:N で Client/Partner と関連）
-- **Invoice**: 案件（請求書）
-- **InvoiceItem**: 案件の品目
-- **Outsource**: 品目ごとの外注先アサイン（複数可）
-
-### リレーション図（概要）
-
-```
-Client ←──M:N──→ PricingRule ←──M:N──→ Partner
-   ↓                                        ↓
-Invoice                                  Outsource
-   ↓                                        ↑
-InvoiceItem ─────────────────────────────┘
-```
-
-## 🔧 開発コマンド
-
+### 2. 依存関係のインストール
 ```bash
-# 開発サーバー起動
-npm run dev
-
-# プロダクションビルド
-npm run build
-
-# プロダクション起動
-npm start
-
-# Prismaスキーマの同期
-npx prisma db push
-
-# Prisma Clientの再生成
-npx prisma generate
-
-# データベースのリセット（注意: 全データ削除）
-rm prisma/dev.db && npx prisma db push
+npm install
 ```
 
-## 🐛 既知の問題
+### 3. 環境変数の設定
+`.env` ファイルを作成し、データベースのパスを設定してください。
+```bash
+# .env
+DATABASE_URL="file:./prisma/dev.db"
+```
 
-- ブラウザテストでタイムアウトが発生する場合があります（開発サーバーの再起動で解決）
-- 大量データでのパフォーマンス最適化が未実施
+### 4. データベースのセットアップ
+```bash
+npx prisma generate
+npx prisma db push
+```
 
-## 📝 ライセンス
+### 5. 開発サーバーの起動
+```bash
+npm run dev
+```
+http://localhost:3000 にアクセスして確認してください。
 
-MIT License
+## <span class="emoji">📂</span> ディレクトリ構成
+- `src/app`: Next.js App Router ページ
+- `src/components`: UIコンポーネント (shadcn/ui 含)
+- `src/actions`: Server Actions (データ操作ロジック)
+- `src/lib`: ユーティリティ、DBクライアント
+- `prisma`: データベーススキーマ、シードデータ
 
-## 👥 コントリビューション
-
-プルリクエストを歓迎します！大きな変更の場合は、まずIssueで議論してください。
-
----
-
-**開発者**: Ryukyu Hono Tec  
-**リポジトリ**: https://github.com/ryukyuhonotec/video-invoice-system
+## <span class="emoji">📝</span> 現在のフェーズ
+**Phase 4: Multi-Relation & Detailed Outsource Management**
+多対多のリレーション構造への移行と、詳細な外注費管理機能の実装・検証段階です。
