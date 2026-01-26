@@ -22,7 +22,7 @@ Next.js (App Router) と Prisma (SQLite) を使用して構築されています
 
 - **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
 - **Language**: TypeScript
-- **Database**: SQLite (via Prisma ORM)
+- **Database**: PostgreSQL (via Prisma ORM) (Formerly SQLite)
 - **UI Components**: [shadcn/ui](https://ui.shadcn.com/) + Tailwind CSS
 - **Server Actions**: バックエンドロジックの統合
 
@@ -40,10 +40,16 @@ npm install
 ```
 
 ### 3. 環境変数の設定
-`.env` ファイルを作成し、データベースのパスを設定してください。
+`.env` ファイルを作成し、データベース(Postgres)の接続情報とGoogle認証情報を設定してください。
 ```bash
 # .env
-DATABASE_URL="file:./prisma/dev.db"
+# Database (PostgreSQL connection string)
+DATABASE_URL="postgresql://user:password@localhost:5432/video_invoice_db"
+
+# Auth Secrets (Google OAuth)
+AUTH_SECRET="[random-string]"
+AUTH_GOOGLE_ID="[your-google-client-id]"
+AUTH_GOOGLE_SECRET="[your-google-client-secret]"
 ```
 
 ### 4. データベースのセットアップ
