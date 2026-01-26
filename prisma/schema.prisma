@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -64,14 +64,20 @@ model PricingRule {
   
   // For FIXED type
   fixedPrice  Float?
-  
+  fixedCost   Float?   // NEW: 発注代金(原価)
+
   // For STEPPED type (stored as JSON)
   steps       String?  // JSON: [{ upTo: number, price: number }]
-  
+  costSteps   String?  // NEW: 発注段階設定 JSON: [{ upTo: number, price: number }]
+
   // For LINEAR type
   incrementalUnit      Float?
   incrementalUnitPrice Float?
   incrementThreshold   Float?
+
+  incrementalCostUnit      Float?  // NEW: 原価基準尺
+  incrementalCostPrice     Float?  // NEW: 原価単価
+  incrementalCostThreshold Float?  // NEW: 原価閾値
   
   // Relations - M:N
   clients     Client[]  @relation("ClientPricingRules")

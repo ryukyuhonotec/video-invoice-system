@@ -11,12 +11,19 @@ export interface PricingRule {
     description?: string;
     type: PricingType;
 
+    // Revenue
     fixedPrice?: number;
     steps?: string | PricingStep[];
-
     incrementalUnit?: number;
     incrementalUnitPrice?: number;
     incrementThreshold?: number;
+
+    // Cost (NEW)
+    fixedCost?: number;
+    costSteps?: string | PricingStep[];
+    incrementalCostUnit?: number;
+    incrementalCostPrice?: number;
+    incrementalCostThreshold?: number;
 
     clients?: Client[];
     partners?: Partner[];
@@ -44,7 +51,7 @@ export interface Partner {
     role: string;
     email?: string;
     chatworkGroup?: string;
-    costRules?: PricingRule[];
+    pricingRules?: PricingRule[];
     outsources?: Outsource[];
 }
 

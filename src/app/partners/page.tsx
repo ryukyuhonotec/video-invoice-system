@@ -25,7 +25,7 @@ export default function PartnersPage() {
     }, []);
 
     const handleAddNew = () => {
-        setEditingPartner({ name: "", role: "エディター", email: "", chatworkGroup: "" });
+        setEditingPartner({ name: "", role: "運用者", email: "", chatworkGroup: "" });
         setIsEditing(true);
     };
 
@@ -77,11 +77,11 @@ export default function PartnersPage() {
                                     value={editingPartner.role}
                                     onChange={e => setEditingPartner({ ...editingPartner, role: e.target.value })}
                                 >
+                                    <option value="統括">統括</option>
                                     <option value="ディレクター">ディレクター</option>
                                     <option value="カメラマン">カメラマン</option>
-                                    <option value="エディター">エディター</option>
+                                    <option value="運用者">運用者</option>
                                     <option value="経理">経理</option>
-                                    <option value="アシスタント">アシスタント</option>
                                     <option value="その他">その他</option>
                                 </Select>
                             </div>
@@ -153,9 +153,9 @@ export default function PartnersPage() {
                                                 {!p.email && !p.chatworkGroup && "-"}
                                             </td>
                                             <td className="p-4 align-middle">
-                                                {p.costRules && p.costRules.length > 0 ? (
+                                                {p.pricingRules && p.pricingRules.length > 0 ? (
                                                     <div className="flex flex-wrap gap-1">
-                                                        {p.costRules.map((r: any) => (
+                                                        {p.pricingRules.map((r: any) => (
                                                             <span key={r.id} className="text-[10px] bg-zinc-100 px-1 rounded truncate max-w-[80px]">
                                                                 {r.name}
                                                             </span>

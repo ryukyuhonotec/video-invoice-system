@@ -209,90 +209,176 @@ export default function PricingRulesPage() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label>料金タイプ</Label>
-                            <Select
-                                value={editingRule.type}
-                                onChange={e => setEditingRule({ ...editingRule, type: e.target.value as PricingType })}
-                            >
-                                <option value="FIXED">固定料金</option>
-                                <option value="STEPPED">階段式 (尺に応じて段階的)</option>
-                                <option value="LINEAR">従量課金 (尺に比例)</option>
-                            </Select>
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <div className="space-y-4 border p-4 rounded-lg bg-white/50">
+                                <h3 className="font-bold text-blue-700 border-b pb-2 flex justify-between items-center">
+                                    受注価格設定 (Revenue)
+                                    <span className="text-xs font-normal text-zinc-500">クライアントへの請求単価</span>
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label>料金タイプ</Label>
+                                        <Select
+                                            value={editingRule.type}
+                                            onChange={e => setEditingRule({ ...editingRule, type: e.target.value as PricingType })}
+                                        >
+                                            <option value="FIXED">固定料金</option>
+                                            <option value="STEPPED">階段式 (尺に応じる)</option>
+                                            <option value="LINEAR">従量課金 (尺に比例)</option>
+                                        </Select>
+                                    </div>
+
+                                    {editingRule.type === 'FIXED' && (
+                                        <div className="space-y-2">
+                                            <Label>売上単価 (円)</Label>
+                                            <Input
+                                                type="number"
+                                                value={editingRule.fixedPrice || 0}
+                                                onChange={e => setEditingRule({ ...editingRule, fixedPrice: parseFloat(e.target.value) })}
+                                                placeholder="10000"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {editingRule.type === 'STEPPED' && (
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label>階段設定 (売上)</Label>
+                                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={addStep}>+ 追加</Button>
+                                            </div>
+                                            {((editingRule.steps as PricingStep[]) || []).map((step, index) => (
+                                                <div key={index} className="flex gap-1 items-center">
+                                                    <Input type="number" value={step.upTo} onChange={e => updateStep(index, 'upTo', parseFloat(e.target.value))} className="w-20 h-8 text-xs" />
+                                                    <span className="text-[10px]">分迄</span>
+                                                    <Input type="number" value={step.price} onChange={e => updateStep(index, 'price', parseFloat(e.target.value))} className="flex-1 h-8 text-xs" />
+                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => removeStep(index)}>×</Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {editingRule.type === 'LINEAR' && (
+                                        <div className="grid gap-2 grid-cols-2">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">単価 (円/分)</Label>
+                                                <Input type="number" value={editingRule.incrementalUnitPrice || 0} onChange={e => setEditingRule({ ...editingRule, incrementalUnitPrice: parseFloat(e.target.value) })} className="h-8 text-xs" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">基準尺 (分)</Label>
+                                                <Input type="number" value={editingRule.incrementalUnit || 1} onChange={e => setEditingRule({ ...editingRule, incrementalUnit: parseFloat(e.target.value) })} className="h-8 text-xs" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 border p-4 rounded-lg bg-white/50">
+                                <h3 className="font-bold text-red-700 border-b pb-2 flex justify-between items-center">
+                                    発注原価設定 (Cost)
+                                    <span className="text-xs font-normal text-zinc-500">パートナーへの支払単価</span>
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="p-2 border border-dashed rounded bg-zinc-50 flex items-center gap-2 mb-2">
+                                        <span className="text-[10px] text-zinc-500">※受注と同じタイプが適用されます</span>
+                                    </div>
+
+                                    {editingRule.type === 'FIXED' && (
+                                        <div className="space-y-2">
+                                            <Label>原価単価 (円)</Label>
+                                            <Input
+                                                type="number"
+                                                value={editingRule.fixedCost || 0}
+                                                onChange={e => setEditingRule({ ...editingRule, fixedCost: parseFloat(e.target.value) })}
+                                                placeholder="7000"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {editingRule.type === 'STEPPED' && (
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label>階段設定 (原価)</Label>
+                                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                                                    const current = (editingRule.costSteps as any as PricingStep[]) || [];
+                                                    setEditingRule({ ...editingRule, costSteps: [...current, { upTo: 0, price: 0 }] as any });
+                                                }}>+ 追加</Button>
+                                            </div>
+                                            {((editingRule.costSteps as any as PricingStep[]) || []).map((step, index) => (
+                                                <div key={index} className="flex gap-1 items-center">
+                                                    <Input type="number" value={step.upTo} onChange={e => {
+                                                        const steps = [...(editingRule.costSteps as any as PricingStep[])];
+                                                        steps[index] = { ...steps[index], upTo: parseFloat(e.target.value) };
+                                                        setEditingRule({ ...editingRule, costSteps: steps as any });
+                                                    }} className="w-20 h-8 text-xs" />
+                                                    <span className="text-[10px]">分迄</span>
+                                                    <Input type="number" value={step.price} onChange={e => {
+                                                        const steps = [...(editingRule.costSteps as any as PricingStep[])];
+                                                        steps[index] = { ...steps[index], price: parseFloat(e.target.value) };
+                                                        setEditingRule({ ...editingRule, costSteps: steps as any });
+                                                    }} className="flex-1 h-8 text-xs" />
+                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => {
+                                                        const steps = [...(editingRule.costSteps as any as PricingStep[])];
+                                                        steps.splice(index, 1);
+                                                        setEditingRule({ ...editingRule, costSteps: steps as any });
+                                                    }}>×</Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {editingRule.type === 'LINEAR' && (
+                                        <div className="grid gap-2 grid-cols-2">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">原価単価 (円/分)</Label>
+                                                <Input type="number" value={editingRule.incrementalCostPrice || 0} onChange={e => setEditingRule({ ...editingRule, incrementalCostPrice: parseFloat(e.target.value) })} className="h-8 text-xs" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">原価基準尺 (分)</Label>
+                                                <Input type="number" value={editingRule.incrementalCostUnit || 1} onChange={e => setEditingRule({ ...editingRule, incrementalCostUnit: parseFloat(e.target.value) })} className="h-8 text-xs" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
-                        {editingRule.type === 'FIXED' && (
-                            <div className="space-y-2">
-                                <Label>単価 (円)</Label>
-                                <Input
-                                    type="number"
-                                    value={editingRule.fixedPrice || 0}
-                                    onChange={e => setEditingRule({ ...editingRule, fixedPrice: parseFloat(e.target.value) })}
-                                    placeholder="10000"
-                                />
+                        {/* Profit Visualization */}
+                        <div className="p-4 rounded-lg bg-zinc-900 text-white flex justify-between items-center shadow-inner">
+                            <div>
+                                <h4 className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold">Estimated Profit Margin</h4>
+                                <div className="text-xs text-zinc-500">※基準尺/固定値での簡易計算</div>
                             </div>
-                        )}
-
-                        {editingRule.type === 'STEPPED' && (
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <Label>階段設定</Label>
-                                    <Button size="sm" variant="outline" onClick={addStep}>+ 段階追加</Button>
-                                </div>
-                                {((editingRule.steps as PricingStep[]) || []).map((step, index) => (
-                                    <div key={index} className="flex gap-2 items-center">
-                                        <Input
-                                            type="number"
-                                            value={step.upTo}
-                                            onChange={e => updateStep(index, 'upTo', parseFloat(e.target.value))}
-                                            placeholder="尺 (分)"
-                                            className="w-32"
-                                        />
-                                        <span>分まで</span>
-                                        <Input
-                                            type="number"
-                                            value={step.price}
-                                            onChange={e => updateStep(index, 'price', parseFloat(e.target.value))}
-                                            placeholder="料金 (円)"
-                                            className="flex-1"
-                                        />
-                                        <Button size="sm" variant="ghost" onClick={() => removeStep(index)}>削除</Button>
-                                    </div>
-                                ))}
+                            <div className="text-right">
+                                {(() => {
+                                    let revenue = 0;
+                                    let cost = 0;
+                                    if (editingRule.type === 'FIXED') {
+                                        revenue = editingRule.fixedPrice || 0;
+                                        cost = editingRule.fixedCost || 0;
+                                    } else if (editingRule.type === 'STEPPED') {
+                                        const steps = (editingRule.steps as PricingStep[]) || [];
+                                        revenue = steps.length > 0 ? steps[0].price : 0;
+                                        const cSteps = (editingRule.costSteps as any as PricingStep[]) || [];
+                                        cost = cSteps.length > 0 ? cSteps[0].price : 0;
+                                    } else {
+                                        revenue = editingRule.incrementalUnitPrice || 0;
+                                        cost = editingRule.incrementalCostPrice || 0;
+                                    }
+                                    const profit = revenue - cost;
+                                    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+                                    return (
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-xl font-mono text-green-400">
+                                                {margin.toFixed(1)}%
+                                            </div>
+                                            <div className="text-lg font-bold">
+                                                ¥{profit.toLocaleString()}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
-                        )}
-
-                        {editingRule.type === 'LINEAR' && (
-                            <div className="grid gap-4 md:grid-cols-3">
-                                <div className="space-y-2">
-                                    <Label>基準尺 (分)</Label>
-                                    <Input
-                                        type="number"
-                                        value={editingRule.incrementalUnit || 1}
-                                        onChange={e => setEditingRule({ ...editingRule, incrementalUnit: parseFloat(e.target.value) })}
-                                        placeholder="1"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>単価 (円/分)</Label>
-                                    <Input
-                                        type="number"
-                                        value={editingRule.incrementalUnitPrice || 0}
-                                        onChange={e => setEditingRule({ ...editingRule, incrementalUnitPrice: parseFloat(e.target.value) })}
-                                        placeholder="5000"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>適用開始尺 (分)</Label>
-                                    <Input
-                                        type="number"
-                                        value={editingRule.incrementThreshold || 0}
-                                        onChange={e => setEditingRule({ ...editingRule, incrementThreshold: parseFloat(e.target.value) })}
-                                        placeholder="0"
-                                    />
-                                </div>
-                            </div>
-                        )}
+                        </div>
 
                         <div className="flex items-center gap-2">
                             <input

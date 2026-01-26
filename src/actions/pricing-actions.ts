@@ -47,10 +47,9 @@ export async function getPartners() {
                         clients: true
                     }
                 },
-            },
+            } as any,
             orderBy: { updatedAt: 'desc' },
         });
-        console.log(`API: getPartners success, found ${partners.length}`);
         return partners;
     } catch (error) {
         console.error("API: getPartners FAILED:", error);
@@ -59,7 +58,7 @@ export async function getPartners() {
 }
 
 export async function upsertPartner(data: any) {
-    const { id, costRules, assignedItems, billingClients, ...rest } = data;
+    const { id, pricingRules, assignedItems, billingClients, ...rest } = data;
     const result = await prisma.partner.upsert({
         where: { id: id || 'new' },
         update: rest,
@@ -86,9 +85,12 @@ export async function getPricingRules() {
 export async function upsertPricingRule(data: any) {
     const { id, clientIds, partnerIds, ...rest } = data;
 
-    // Convert steps to string if it's an object/array
+    // Convert steps objects to JSON strings
     if (rest.steps && typeof rest.steps !== 'string') {
         rest.steps = JSON.stringify(rest.steps);
+    }
+    if (rest.costSteps && typeof rest.costSteps !== 'string') {
+        rest.costSteps = JSON.stringify(rest.costSteps);
     }
 
     // Relations formatting
@@ -119,6 +121,34 @@ export async function upsertPricingRule(data: any) {
 export async function deletePricingRule(id: string) {
     await prisma.pricingRule.delete({ where: { id } });
     revalidatePath('/pricing-rules');
+}
+
+// --- Supervisors ---
+export async function getSupervisors() {
+    return await prisma.supervisor.findMany({
+        orderBy: { name: 'asc' },
+    });
+}
+
+export async function upsertSupervisor(data: any) {
+    const { id, ...rest } = data;
+    const result = await prisma.supervisor.upsert({
+        where: { id: id || 'new' },
+        update: rest,
+        create: {
+            ...rest,
+            id: id && !id.startsWith('sup-') ? id : undefined,
+        },
+    });
+    revalidatePath('/supervisors');
+    revalidatePath('/');
+    return result;
+}
+
+export async function deleteSupervisor(id: string) {
+    await prisma.supervisor.delete({ where: { id } });
+    revalidatePath('/supervisors');
+    revalidatePath('/');
 }
 
 // --- Invoices ---
@@ -172,4 +202,23 @@ export async function upsertInvoice(data: any) {
     revalidatePath('/');
     revalidatePath('/invoices/[id]', 'page');
     return result;
+}
+
+export async function getInvoices() {
+    return await prisma.invoice.findMany({
+        include: {
+            client: true,
+            supervisor: true,
+            items: {
+                include: {
+                    outsources: {
+                        include: {
+                            partner: true
+                        }
+                    }
+                }
+            }
+        },
+        orderBy: { updatedAt: 'desc' }
+    });
 }
