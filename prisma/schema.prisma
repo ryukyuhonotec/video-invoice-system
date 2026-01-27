@@ -89,6 +89,20 @@ model PartnerRole {
   createdAt DateTime @default(now())
 }
 
+// Staff invitation link system
+model StaffInvitation {
+  id        String    @id @default(uuid())
+  email     String?   // Pre-set email (optional)
+  name      String?   // Pre-set name (optional)
+  staffRole String    // OPERATIONS or ACCOUNTING
+  token     String    @unique @default(uuid())
+  expiresAt DateTime
+  usedAt    DateTime?
+  usedBy    String?   // User ID who used this invitation
+  createdBy String?   // User ID who created this invitation
+  createdAt DateTime  @default(now())
+}
+
 model Staff {
   id        String    @id @default(uuid())
   name      String

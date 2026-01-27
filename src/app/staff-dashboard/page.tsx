@@ -13,6 +13,7 @@ import { upsertStaff, getStaff, getClients, getInvoices, addClientContact, getCl
 import { Staff, Client, Invoice } from "@/types";
 import { Users, TrendingUp, Building2, ChevronLeft, ChevronRight, Percent, Phone, Calendar, MessageSquare, PenSquare, ShieldCheck, Calculator } from "lucide-react";
 import { useRouter } from "next/navigation";
+import RevenueChart from "@/components/RevenueChart";
 
 export default function StaffDashboardPage() {
     return (
@@ -466,6 +467,22 @@ function StaffDashboardContent() {
                                     </div>
                                 </CardContent>
                             </Card>
+
+                            {/* Revenue Pie Chart */}
+                            <div className="mb-8">
+                                <RevenueChart
+                                    invoices={invoices.filter(inv => {
+                                        const client = clients.find(c => c.id === inv.clientId);
+                                        if (client?.operationsLeadId !== selectedStaffId) return false;
+                                        if (!inv.issueDate) return false;
+                                        const date = new Date(inv.issueDate);
+                                        return date.getFullYear() === selectedYear && date.getMonth() === selectedMonth;
+                                    })}
+                                    clients={clients}
+                                    title={`売上構成 (${selectedYear}年${selectedMonth + 1}月)`}
+                                    showTopN={5}
+                                />
+                            </div>
 
                             {/* Revenue by Client */}
                             <Card className="mb-8 dark:bg-zinc-900 dark:border-zinc-800">

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { PlusCircle, FileText, Search } from "lucide-react";
 import { Invoice, Client, Partner, Staff } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
+import RevenueChart from "@/components/RevenueChart";
 
 interface DashboardProps {
     initialInvoices: Invoice[];
@@ -201,6 +202,16 @@ export default function Dashboard({
                         <div className="text-xs text-zinc-500 dark:text-zinc-400">請求済/入金済</div>
                     </CardContent>
                 </Card>
+            </div>
+
+            {/* Revenue Pie Chart */}
+            <div className="mb-6">
+                <RevenueChart
+                    invoices={initialInvoices}
+                    clients={initialClients}
+                    title="クライアント別売上構成（上位5社）"
+                    showTopN={5}
+                />
             </div>
 
             {/* Filters */}
