@@ -15,19 +15,50 @@ model Client {
   website         String?
   contactPerson   String?
   chatworkGroup   String?
+  description     String? // 備考
+  lastContactDate DateTime? // 最終連絡日（掘り起こし用）
+  isArchived      Boolean  @default(false)
   
+  // Contract Status
+  contractSigned  Boolean  @default(false)
+  contractUrl     String?  // Link to signed contract
+
   billingContactId String?
   billingContact   Partner? @relation("ClientBillingContact", fields: [billingContactId], references: [id])
   
+  // Staff Roles
+  operationsLeadId String?
+  operationsLead   Staff? @relation("ClientOpsLead", fields: [operationsLeadId], references: [id])
+  accountantId     String?
+  accountant       Staff? @relation("ClientAccountant", fields: [accountantId], references: [id])
+
   sns1            String?
   sns2            String?
   sns3            String?
 
   pricingRules    PricingRule[] @relation("ClientPricingRules")
   invoices        Invoice[]
+  bills           Bill[]
+  contactHistory  ClientContact[] // 連絡履歴
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// 掘り起こしクライアントへの連絡履歴
+model ClientContact {
+  id              String   @id @default(uuid())
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  contactDate     DateTime // 連絡した日
+  note            String?  // メモ・連絡内容
+  nextContactDate DateTime? // 次回連絡予定（タスク用）
+  createTask      Boolean  @default(false) // 進行管理にタスク追加するか
+  
+  createdBy       String?  // 連絡した担当者ID（Staff）
+  
+  createdAt       DateTime @default(now())
 }
 
 model Partner {
@@ -36,6 +67,8 @@ model Partner {
   role          String
   email         String?
   chatworkGroup String?
+  position      String? // 役職
+  description   String? // 備考
   
   pricingRules  PricingRule[] @relation("PartnerCostRules")
   outsources    Outsource[]
@@ -43,14 +76,31 @@ model Partner {
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  isArchived    Boolean  @default(false)
+  
+  // Contract Status
+  contractSigned Boolean @default(false)
+  contractUrl    String? // Link to signed contract
 }
 
-model Supervisor {
+model PartnerRole {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Staff {
   id        String    @id @default(uuid())
   name      String
   email     String?
+  role      String    @default("OPERATIONS") // OPERATIONS (事業統括), ACCOUNTING (経理)
+  
+  userId    String?   @unique
+  user      User?     @relation(fields: [userId], references: [id])
   
   invoices  Invoice[]
+  opsClients Client[] @relation("ClientOpsLead")
+  accClients Client[] @relation("ClientAccountant")
   
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -85,7 +135,9 @@ model PricingRule {
   
   isDefault   Boolean  @default(false)
   
-  invoiceItems InvoiceItem[]
+  outsources   Outsource[] // TaskAssignments using this rule
+  
+  referenceInfo String? // NEW: Discussion reference URL/Note
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -97,12 +149,22 @@ model Invoice {
   clientId            String
   client              Client   @relation(fields: [clientId], references: [id])
   
-  supervisorId        String?
-  supervisor          Supervisor? @relation(fields: [supervisorId], references: [id])
+  staffId             String?
+  staff               Staff?   @relation(fields: [staffId], references: [id])
+  
+  createdById         String?
+  createdBy           User?    @relation("InvoiceCreator", fields: [createdById], references: [id])
   
   issueDate           DateTime? 
   dueDate             DateTime?
+  actualDeliveryDate  DateTime?
+  deliveryUrl         String?   // Chat/Folder URL
+  requestUrl          String?   // NEW: Request Chat URL
+  
   status              String   @default("DRAFT")
+  
+  billId              String?
+  bill                Bill?    @relation(fields: [billId], references: [id])
   
   communicationChannel String?
 
@@ -125,41 +187,107 @@ model InvoiceItem {
   invoiceId         String
   invoice           Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   
-  name              String
-  duration          Float?
+  name              String      // 品目名 e.g., "PR動画"
   quantity          Int      @default(1)
-  unitPrice         Float    @default(0)
-  amount            Float    @default(0)
+  unitPrice         Float    @default(0)   // 合計請求額（全タスクの合計）
+  amount            Float    @default(0)   // Same as unitPrice * quantity
   
-  pricingRuleId     String?
-  pricingRule       PricingRule? @relation(fields: [pricingRuleId], references: [id])
+  // pricingRuleId removed - now managed per task in Outsource
   
-  outsources        Outsource[]
+  outsources        Outsource[] // タスク（担当領域）のリスト
   
-  productionStatus  String   @default("Pre-Order")
-  deliveryDate      DateTime?
-  deliveryUrl       String?
+  productionStatus  String   @default("受注前") // Legacy, may be removed
+  deliveryUrl       String?  // 納品URL（品目全体）
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
 
+// Outsource = TaskAssignment (タスク/担当領域)
+// Each task has: pricing rule, partner, delivery date, revenue, cost
 model Outsource {
   id                String   @id @default(uuid())
   
   invoiceItemId     String
   invoiceItem       InvoiceItem @relation(fields: [invoiceItemId], references: [id], onDelete: Cascade)
   
-  partnerId         String
-  partner           Partner     @relation(fields: [partnerId], references: [id])
+  // 料金ルール（担当領域）- NEW
+  pricingRuleId     String?
+  pricingRule       PricingRule? @relation(fields: [pricingRuleId], references: [id])
   
-  amount            Float       @default(0)
-  description       String?
-  status            String      @default("Pending") // 未発注, 発注済, 完了, 支払済
-  deliveryUrl       String?
+  // 担当パートナー
+  partnerId         String?
+  partner           Partner?    @relation(fields: [partnerId], references: [id])
+  
+  // 金額
+  revenueAmount     Float       @default(0) // 請求額（このタスク分）
+  costAmount        Float       @default(0) // 原価（パートナーへの発注額）
+  
+  // 納期 - NEW
+  deliveryDate      DateTime?   // このタスクの納期
+  duration          String?     // 尺 (mm:ss) - Moved from InvoiceItem
+  
+  // ステータス
+  status            String      @default("受注前") // 受注前, 制作中, 確認中, 納品済, 請求済, 入金済み
+  
+  description       String?     // 備考
+  deliveryUrl       String?     // 成果物URL
   
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+}
+
+model CompanyProfile {
+  id                  String  @id @default("master")
+  name                String  @default("My Company")
+  address             String?
+  phone               String?
+  email               String?
+  registrationNumber  String? // T-Number
+  
+  bankName            String?
+  bankBranch          String?
+  bankAccountType     String? // 普通, 当座
+  bankAccountNumber   String?
+  bankAccountHolder   String?
+  
+  updatedAt           DateTime @updatedAt
+}
+
+model Bill {
+  id            String   @id @default(uuid())
+  billNumber    String?  // Sequential ID if needed
+  subject       String?  // NEW: 請求書件名
+  notes         String?  // NEW: 備考欄
+  
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id])
+  
+  invoices      Invoice[]
+  
+  issueDate     DateTime
+  paymentDueDate DateTime?
+  
+  totalAmount   Float
+  tax           Float
+  
+  status        String   @default("ISSUED") // ISSUED, PAID
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  targetId  String
+  targetType String  @default("INVOICE")
+  details   String?
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
 }
 
 // --- NextAuth Models ---
@@ -172,6 +300,10 @@ model User {
   image         String?
   accounts      Account[]
   sessions      Session[]
+  
+  staff         Staff?
+  auditLogs     AuditLog[]
+  createdInvoices Invoice[] @relation("InvoiceCreator")
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

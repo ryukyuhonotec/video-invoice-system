@@ -9,6 +9,7 @@ declare global {
 }
 
 const prisma = globalThis.prisma ?? prismaClientSingleton();
+// const prisma = new PrismaClient(); // Force new instance for schema update
 
 export default prisma;
 

@@ -1,23 +1,45 @@
 import { PricingRule, Partner, PricingStep } from "@/types";
 
-export function calculatePrice(rule: PricingRule, durationInMinutes: number): number {
-    if (rule.type === 'FIXED') {
-        return rule.fixedPrice || 0;
+export function parseDuration(durationStr: string | number | undefined): number {
+    if (!durationStr) return 0;
+    if (typeof durationStr === 'number') return durationStr;
+
+    // Check format "mm:ss"
+    const parts = durationStr.split(':');
+    if (parts.length === 2) {
+        const min = parseInt(parts[0], 10);
+        const sec = parseInt(parts[1], 10);
+        if (!isNaN(min) && !isNaN(sec)) {
+            return min + (sec / 60);
+        }
     }
 
-    // Handle STEPPED / LINEAR with possible increments
+    // Fallback if just number in string
+    const num = parseFloat(durationStr);
+    return isNaN(num) ? 0 : num;
+}
+
+export function calculatePrice(rule: PricingRule, durationInput: number | string, side: 'revenue' | 'cost' = 'revenue'): number {
+    const durationInMinutes = parseDuration(durationInput);
+
+    if (rule.type === 'FIXED') {
+        return (side === 'revenue' ? rule.fixedPrice : rule.fixedCost) || 0;
+    }
+
+    // Handle STEPPED / LINEAR
     let price = 0;
 
     // 1. Check Steps
+    const rawSteps = side === 'revenue' ? rule.steps : rule.costSteps;
     let steps: PricingStep[] = [];
-    if (typeof rule.steps === 'string') {
+    if (typeof rawSteps === 'string') {
         try {
-            steps = JSON.parse(rule.steps);
+            steps = JSON.parse(rawSteps);
         } catch (e) {
             steps = [];
         }
-    } else if (Array.isArray(rule.steps)) {
-        steps = rule.steps;
+    } else if (Array.isArray(rawSteps)) {
+        steps = rawSteps;
     }
 
     if (steps.length > 0) {
@@ -34,33 +56,29 @@ export function calculatePrice(rule: PricingRule, durationInMinutes: number): nu
 
     // 2. Handle Increments
     const stepsArr = steps;
-    const threshold = rule.incrementThreshold ?? (stepsArr.length > 0 ? stepsArr[stepsArr.length - 1].upTo : 0);
+    const revThreshold = rule.incrementThreshold ?? (stepsArr.length > 0 ? stepsArr[stepsArr.length - 1].upTo : 0);
+    const costThreshold = rule.incrementalCostThreshold ?? (stepsArr.length > 0 ? stepsArr[stepsArr.length - 1].upTo : 0);
+    const threshold = side === 'revenue' ? revThreshold : costThreshold;
 
-    if (rule.incrementalUnitPrice && durationInMinutes > threshold) {
+    const unit = side === 'revenue' ? (rule.incrementalUnit || 1) : (rule.incrementalCostUnit || 1);
+    const unitPrice = side === 'revenue' ? (rule.incrementalUnitPrice || 0) : (rule.incrementalCostPrice || 0);
+
+    if (unitPrice && durationInMinutes > threshold) {
         const excessDuration = durationInMinutes - threshold;
-        const unit = rule.incrementalUnit || 1;
         const unitsToAdd = Math.ceil(excessDuration / unit);
-        price += unitsToAdd * rule.incrementalUnitPrice;
+        price += unitsToAdd * unitPrice;
     }
 
     return price;
 }
 
-export function calculatePartnerCost(partner: Partner, clientId: string | undefined, durationInMinutes: number): number {
-    if (!partner.costRules || partner.costRules.length === 0) return 0;
+export function calculatePartnerCost(partner: Partner, clientId: string | undefined, durationInput: number | string): number {
+    const durationInMinutes = parseDuration(durationInput);
+    if (!partner.pricingRules || partner.pricingRules.length === 0) return 0;
 
-    // 1. Find the best matching rule
-    // Priority: Client Specific Rule > Generic Rule (no client selection)
-    let rule = partner.costRules.find(r => r.clients?.some(c => c.id === clientId));
-
-    if (!rule) {
-        // Fallback to generic rule (no clients assigned)
-        rule = partner.costRules.find(r => !r.clients || r.clients.length === 0);
-    }
-
+    let rule = partner.pricingRules.find(r => r.clients?.some(c => c.id === clientId));
+    if (!rule) rule = partner.pricingRules.find(r => !r.clients || r.clients.length === 0);
     if (!rule) return 0;
 
-    // 2. Calculate using the same logic as calculatePrice (since structures are compatible)
-    // We treat PartnerCostRule as PricingRule for calculation purposes as they share structure
-    return calculatePrice(rule as any as PricingRule, durationInMinutes);
+    return calculatePrice(rule, durationInMinutes, 'cost');
 }

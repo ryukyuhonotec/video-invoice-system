@@ -1,4 +1,4 @@
-import { Client, Invoice, PricingRule, Partner, Supervisor } from "@/types";
+import { Client, Invoice, PricingRule, Partner } from "@/types";
 
 export const MOCK_PRICING_RULES: PricingRule[] = [
     {
@@ -64,17 +64,13 @@ export const MOCK_PARTNERS: Partner[] = [
     { id: "p-004", name: "高橋 経理", role: "経理", email: "takahashi@example.com", chatworkGroup: "https://www.chatwork.com/g/accounting" },
 ];
 
-export const MOCK_SUPERVISORS: Supervisor[] = [
-    { id: "s-001", name: "田中 統括" },
-    { id: "s-002", name: "山本 マネージャー" }
-];
+
 
 export const MOCK_INVOICES: Invoice[] = [
     {
         id: "inv-001",
         clientId: "client-a",
-        supervisorId: "s-001",
-        communicationChannel: "https://slack.com/archives/C12345678",
+        staffId: undefined,
         issueDate: "2024-05-01",
         status: "Unbilled",
         subtotal: 0,
@@ -88,19 +84,20 @@ export const MOCK_INVOICES: Invoice[] = [
                 id: "item-1",
                 invoiceId: "inv-001",
                 name: "社長インタビュー",
-                pricingRuleId: "rule-standard-video",
-                duration: 2.5,
+                duration: "2.5", // changed to string as per schema
                 quantity: 1,
                 unitPrice: 0,
                 amount: 0,
                 productionStatus: "In Progress",
-                deliveryDate: "2024-05-20",
                 outsources: [
                     {
                         id: "o-1",
                         invoiceItemId: "item-1",
+                        pricingRuleId: "rule-standard-video",
                         partnerId: "p-001",
-                        amount: 15000,
+                        revenueAmount: 0,
+                        costAmount: 15000,
+                        deliveryDate: "2024-05-20",
                         status: "Ordered"
                     }
                 ]
