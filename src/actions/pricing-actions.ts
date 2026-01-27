@@ -3,6 +3,8 @@
 import prisma from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { InvoiceStatus, ProductionStatus } from "@/types";
+import { auth } from "@/auth";
+import { logAction } from "./audit-actions";
 
 // --- Partner Roles ---
 export async function getPartnerRoles() {
@@ -64,6 +66,7 @@ export async function upsertClient(data: any) {
     if (rest.accountantId === "") rest.accountantId = null;
     if (rest.billingContactId === "") rest.billingContactId = null;
 
+    const isNew = !id || id.startsWith('new-');
     const result = await prisma.client.upsert({
         where: { id: id || 'new' },
         update: rest,
@@ -72,6 +75,15 @@ export async function upsertClient(data: any) {
             id: id && !id.startsWith('new-') ? id : undefined,
         },
     });
+
+    // Audit logging
+    await logAction({
+        action: isNew ? "CREATE" : "UPDATE",
+        targetType: "CLIENT",
+        targetId: result.id,
+        details: { name: result.name }
+    });
+
     revalidatePath('/clients');
     return result;
 }
@@ -287,7 +299,6 @@ export async function deleteStaff(id: string) {
 }
 
 // --- Invoices ---
-import { auth } from "@/auth";
 
 export async function upsertInvoice(data: any) {
     const session = await auth();

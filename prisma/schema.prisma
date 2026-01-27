@@ -298,6 +298,7 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  role          String    @default("STAFF") // OWNER, STAFF
   accounts      Account[]
   sessions      Session[]
   
