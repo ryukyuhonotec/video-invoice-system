@@ -37,7 +37,7 @@ export const MOCK_CLIENTS: Client[] = [
     {
         id: "client-a",
         name: "株式会社ClientA",
-        billingContact: "経理 佐藤様",
+        contactPerson: "経理 佐藤様",
     },
     {
         id: "client-b",
