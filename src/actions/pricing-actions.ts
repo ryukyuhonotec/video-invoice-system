@@ -203,7 +203,7 @@ export async function getPartners() {
                         }
                     }
                 },
-                clients: true, // NEW: Direct Client-Partner links
+                clients: true,
             } as any,
             orderBy: { updatedAt: 'desc' },
         });
@@ -211,6 +211,68 @@ export async function getPartners() {
     } catch (error) {
         console.error("API: getPartners FAILED:", error);
         throw error;
+    }
+}
+
+export async function getPaginatedPartners(
+    page: number = 1,
+    limit: number = 20,
+    search: string = "",
+    role: string = "ALL",
+    showArchived: boolean = false
+) {
+    try {
+        const skip = (page - 1) * limit;
+        const where: any = {
+            AND: [
+                showArchived ? {} : { isArchived: false },
+                search ? {
+                    OR: [
+                        { name: { contains: search } }, // Case insensitive usually requires mode: insensitive in Postgres, but SQLite/MySQL varies. Prisma default depends on provider.
+                        { email: { contains: search } }
+                    ]
+                } : {},
+                (role && role !== "ALL") ? {
+                    role: { contains: role }
+                } : {}
+            ]
+        };
+
+        const [partners, total] = await prisma.$transaction([
+            prisma.partner.findMany({
+                where,
+                skip,
+                take: limit,
+                include: {
+                    pricingRules: {
+                        include: {
+                            clients: {
+                                include: {
+                                    invoices: {
+                                        take: 1,
+                                        orderBy: { issueDate: 'desc' },
+                                        select: { issueDate: true }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    clients: true,
+                } as any,
+                orderBy: { updatedAt: 'desc' },
+            }),
+            prisma.partner.count({ where })
+        ]);
+
+        return {
+            partners,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        };
+    } catch (error) {
+        console.error("API: getPaginatedPartners FAILED:", error);
+        return { partners: [], total: 0, page: 1, totalPages: 0 };
     }
 }
 

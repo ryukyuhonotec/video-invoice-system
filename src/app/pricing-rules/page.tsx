@@ -7,9 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { getPricingRules, upsertPricingRule, deletePricingRule, getClients, getPartners } from "@/actions/pricing-actions";
 import { PricingRule, Client, Partner, PricingType, PricingStep } from "@/types";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Trash2 } from "lucide-react";
 
 export default function PricingRulesPage() {
     const [rules, setRules] = useState<PricingRule[]>([]);
@@ -27,6 +37,8 @@ export default function PricingRulesPage() {
         clientIds: [],
         partnerIds: []
     });
+
+    const [ruleToDelete, setRuleToDelete] = useState<string | null>(null);
 
     // Search states for selection
     const [clientSearch, setClientSearch] = useState("");
@@ -109,14 +121,19 @@ export default function PricingRulesPage() {
         setIsLoading(false);
     };
 
-    const handleDelete = async (id: string) => {
-        if (confirm('このルールを削除してもよろしいですか?')) {
-            setIsLoading(true);
-            await deletePricingRule(id);
-            const updatedRules = await getPricingRules();
-            setRules(updatedRules as any);
-            setIsLoading(false);
-        }
+    const handleDelete = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setRuleToDelete(id);
+    };
+
+    const executeDelete = async () => {
+        if (!ruleToDelete) return;
+        setIsLoading(true);
+        await deletePricingRule(ruleToDelete);
+        const updatedRules = await getPricingRules();
+        setRules(updatedRules as any);
+        setIsLoading(false);
+        setRuleToDelete(null);
     };
 
     const toggleClientId = (id: string) => {
@@ -264,12 +281,19 @@ export default function PricingRulesPage() {
                                                 <Label>階段設定 (売上)</Label>
                                                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={addStep}>+ 追加</Button>
                                             </div>
+                                            {/* Header Labels (Improvement #7) */}
+                                            {((editingRule.steps as PricingStep[])?.length > 0) && (
+                                                <div className="flex gap-1 text-xs text-zinc-500 px-1 mb-1">
+                                                    <span className="w-20">上限(分)</span>
+                                                    <span className="flex-1 ml-6">金額(円)</span>
+                                                </div>
+                                            )}
                                             {((editingRule.steps as PricingStep[]) || []).map((step, index) => (
                                                 <div key={index} className="flex gap-1 items-center">
-                                                    <Input type="number" value={step.upTo} onChange={e => updateStep(index, 'upTo', parseFloat(e.target.value))} className="w-20 h-8 text-xs" />
-                                                    <span className="text-[10px]">分迄</span>
-                                                    <Input type="number" value={step.price} onChange={e => updateStep(index, 'price', parseFloat(e.target.value))} className="flex-1 h-8 text-xs" />
-                                                    <Button size="sm" variant="ghost" onClick={() => removeStep(index)}>×</Button>
+                                                    <Input placeholder="分" type="number" value={step.upTo} onChange={e => updateStep(index, 'upTo', parseFloat(e.target.value))} className="w-20 h-8 text-xs" />
+                                                    <span className="text-[10px] text-zinc-500">分迄</span>
+                                                    <Input placeholder="金額" type="number" value={step.price} onChange={e => updateStep(index, 'price', parseFloat(e.target.value))} className="flex-1 h-8 text-xs" />
+                                                    <Button size="sm" variant="ghost" onClick={() => removeStep(index)}><Trash2 className="w-3 h-3 text-zinc-400 hover:text-red-500" /></Button>
                                                 </div>
                                             ))}
                                         </div>
@@ -309,15 +333,22 @@ export default function PricingRulesPage() {
                                                     setEditingRule({ ...editingRule, costSteps: [...current, { upTo: 0, price: 0 }] as any });
                                                 }}>+ 追加</Button>
                                             </div>
+                                            {/* Header Labels (Improvement #7) */}
+                                            {((editingRule.costSteps as any as PricingStep[])?.length > 0) && (
+                                                <div className="flex gap-1 text-xs text-zinc-500 px-1 mb-1">
+                                                    <span className="w-20">上限(分)</span>
+                                                    <span className="flex-1 ml-6">金額(円)</span>
+                                                </div>
+                                            )}
                                             {((editingRule.costSteps as any as PricingStep[]) || []).map((step, index) => (
                                                 <div key={index} className="flex gap-1 items-center">
-                                                    <Input type="number" value={step.upTo} onChange={e => {
+                                                    <Input placeholder="分" type="number" value={step.upTo} onChange={e => {
                                                         const steps = [...(editingRule.costSteps as any as PricingStep[])];
                                                         steps[index] = { ...steps[index], upTo: parseFloat(e.target.value) };
                                                         setEditingRule({ ...editingRule, costSteps: steps as any });
                                                     }} className="w-20 h-8 text-xs" />
-                                                    <span className="text-[10px]">分迄</span>
-                                                    <Input type="number" value={step.price} onChange={e => {
+                                                    <span className="text-[10px] text-zinc-500">分迄</span>
+                                                    <Input placeholder="金額" type="number" value={step.price} onChange={e => {
                                                         const steps = [...(editingRule.costSteps as any as PricingStep[])];
                                                         steps[index] = { ...steps[index], price: parseFloat(e.target.value) };
                                                         setEditingRule({ ...editingRule, costSteps: steps as any });
@@ -326,7 +357,7 @@ export default function PricingRulesPage() {
                                                         const steps = [...(editingRule.costSteps as any as PricingStep[])];
                                                         steps.splice(index, 1);
                                                         setEditingRule({ ...editingRule, costSteps: steps as any });
-                                                    }}>×</Button>
+                                                    }}><Trash2 className="w-3 h-3 text-zinc-400 hover:text-red-500" /></Button>
                                                 </div>
                                             ))}
                                         </div>
@@ -443,6 +474,21 @@ export default function PricingRulesPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <AlertDialog open={!!ruleToDelete} onOpenChange={(open) => !open && setRuleToDelete(null)}>
+                <AlertDialogContent className="dark:bg-zinc-900 dark:border-zinc-700">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="dark:text-zinc-100">ルールを削除しますか？</AlertDialogTitle>
+                        <AlertDialogDescription className="dark:text-zinc-400">
+                            この操作は取り消せません。このルールは永久に削除されます。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700">キャンセル</AlertDialogCancel>
+                        <AlertDialogAction onClick={executeDelete} className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800">削除する</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

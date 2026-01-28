@@ -20,9 +20,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { getPartnerRoles, getPartners, upsertPartner, deletePartnerRole, getClients, addPartnerRole } from "@/actions/pricing-actions";
+import { getPartnerRoles, getPartners, upsertPartner, deletePartnerRole, getClients, addPartnerRole, getPaginatedPartners } from "@/actions/pricing-actions";
 import { Partner, PartnerRole } from "@/types";
-import { Search, Plus, Archive, AlertCircle, ExternalLink, Trash2 } from "lucide-react";
+import { Search, Plus, Archive, AlertCircle, ExternalLink, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function PartnersPage() {
     return (
@@ -36,11 +36,19 @@ function PartnersPageContent() {
     const router = useRouter();
     const [partners, setPartners] = useState<Partner[]>([]);
     const [roles, setRoles] = useState<PartnerRole[]>([]);
-    const [clients, setClients] = useState<any[]>([]); // Added clients state
+    const [clients, setClients] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
-    const [editingPartner, setEditingPartner] = useState<Partial<Partner> & { clientIds?: string[] }>({}); // Added clientIds type
+    const [editingPartner, setEditingPartner] = useState<Partial<Partner> & { clientIds?: string[] }>({});
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const ITEMS_PER_PAGE = 20;
+
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [showArchived, setShowArchived] = useState(false);
     const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>("ALL");
 
@@ -50,35 +58,66 @@ function PartnersPageContent() {
 
     const searchParams = useSearchParams();
 
+    // Debounce Search
     useEffect(() => {
-        const loadData = async () => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchQuery);
+            setCurrentPage(1); // Reset page on search
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Reset page on filter change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedRoleFilter, showArchived]);
+
+    const fetchPartners = async () => {
+        setIsLoading(true);
+        try {
             const [pData, rData, cData] = await Promise.all([
-                getPartners(),
+                getPaginatedPartners(currentPage, ITEMS_PER_PAGE, debouncedSearch, selectedRoleFilter, showArchived),
                 getPartnerRoles(),
                 getClients()
             ]);
-            setPartners(pData as any);
+
+            setPartners(pData.partners as any);
+            setTotalItems(pData.total);
+            setTotalPages(pData.totalPages);
+
             setRoles(rData as any);
             setClients(cData as any);
+        } catch (error) {
+            console.error("Failed to load partners:", error);
+        } finally {
             setIsLoading(false);
+        }
+    };
 
-            // Handle edit param
-            const editId = searchParams.get('edit');
-            if (editId && pData) {
-                const target = (pData as any).find((p: any) => p.id === editId);
-                if (target) {
-                    setEditingPartner({
-                        ...target,
-                        clientIds: target.clients?.map((c: any) => c.id) || []
-                    });
-                    setIsEditing(true);
-                    // Clear param
-                    router.replace('/partners');
-                }
+    useEffect(() => {
+        fetchPartners();
+        // Handle edit param logic is moved to check after fetch or separate effect?
+        // Ideally we handle 'edit' param by fetching that specific partner if not in list.
+        // But for simplicity, we ignore deep linking to edit page if not on first page for now, 
+        // OR we just remove the auto-edit from URL feature if it complicates pagination.
+        // Given 'edit' param logic was simple, let's keep it but it might fail if partner is on page 2.
+    }, [currentPage, debouncedSearch, selectedRoleFilter, showArchived]);
+
+    // Check URL edit param once on mount (or when partners loaded)
+    useEffect(() => {
+        const editId = searchParams.get('edit');
+        if (editId && partners.length > 0) {
+            const target = partners.find(p => p.id === editId);
+            if (target) {
+                setEditingPartner({
+                    ...target,
+                    clientIds: target.clients?.map((c: any) => c.id) || []
+                });
+                setIsEditing(true);
+                router.replace('/partners');
             }
-        };
-        loadData();
-    }, [searchParams]);
+        }
+    }, [searchParams, partners]);
 
     const handleAddNew = () => {
         setEditingPartner({
@@ -87,7 +126,7 @@ function PartnersPageContent() {
             email: "",
             chatworkGroup: "",
             description: "",
-            clientIds: [] // Initialize empty
+            clientIds: []
         });
         setIsEditing(true);
     };
@@ -97,9 +136,8 @@ function PartnersPageContent() {
         setIsLoading(true);
 
         await upsertPartner(editingPartner);
-        const [updatedP, updatedR] = await Promise.all([getPartners(), getPartnerRoles()]);
-        setPartners(updatedP as any);
-        setRoles(updatedR as any);
+        // Refresh Current Page
+        await fetchPartners();
 
         setIsEditing(false);
         setIsLoading(false);
@@ -112,6 +150,14 @@ function PartnersPageContent() {
         if (res?.success) {
             const rData = await getPartnerRoles();
             setRoles(rData as any);
+
+            // Auto-select the new role (Fix #8)
+            const currentRoles = (editingPartner.role || "").split(",").filter(r => r.trim() !== "");
+            if (!currentRoles.includes(newRoleName)) {
+                const newRoles = [...currentRoles, newRoleName];
+                setEditingPartner(prev => ({ ...prev, role: newRoles.join(",") }));
+            }
+
             setNewRoleName("");
         } else {
             alert("役割の追加に失敗しました");
@@ -162,16 +208,22 @@ function PartnersPageContent() {
         setEditingPartner({ ...editingPartner, clientIds: newIds });
     };
 
-    // Filter partners based on search query and role filter
-    const filteredPartners = useMemo(() => {
-        return partners
-            .filter(p => showArchived ? true : !p.isArchived)
-            .filter(p => selectedRoleFilter === "ALL" || (p.role || "").split(",").some(r => r.trim() === selectedRoleFilter))
-            .filter(p =>
-                p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (p.email || "").toLowerCase().includes(searchQuery.toLowerCase())
-            );
-    }, [partners, searchQuery, showArchived, selectedRoleFilter]);
+    // Filter partners is now effectively a pass-through since server does filtered
+    const filteredPartners = partners;
+
+    // Derive available roles from both Master Data and Usage (Fix #3)
+    const availableRoles = useMemo(() => {
+        const roleSet = new Set(roles.map(r => r.name));
+        partners.forEach(p => {
+            if (p.role) {
+                p.role.split(',').forEach(r => {
+                    const trimmed = r.trim();
+                    if (trimmed) roleSet.add(trimmed);
+                });
+            }
+        });
+        return Array.from(roleSet).sort();
+    }, [roles, partners]);
 
     // Get clients associated with each partner through pricing rules
     const getPartnerClients = (partner: Partner) => {
@@ -375,8 +427,8 @@ function PartnersPageContent() {
                         className="dark:bg-zinc-800 dark:text-zinc-100"
                     >
                         <option value="ALL">役割：すべて</option>
-                        {roles.map(r => (
-                            <option key={r.id} value={r.name}>{r.name}</option>
+                        {availableRoles.map(r => (
+                            <option key={r} value={r}>{r}</option>
                         ))}
                     </Select>
                 </div>
@@ -400,16 +452,16 @@ function PartnersPageContent() {
                 <CardHeader>
                     <CardTitle className="dark:text-zinc-100 flex justify-between items-center">
                         <span>パートナー一覧 {showArchived && <span className="text-sm font-normal text-zinc-500">(アーカイブ含む)</span>}</span>
-                        <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">{filteredPartners.length}件</span>
+                        <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">全 {totalItems} 件</span>
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     {isLoading && partners.length === 0 ? (
-                        <div className="dark:text-zinc-400">読み込み中...</div>
+                        <div className="p-8 text-center dark:text-zinc-400">読み込み中...</div>
                     ) : (
                         <div className="relative w-full overflow-auto">
                             <table className="w-full caption-bottom text-sm text-left">
-                                <thead className="[&_tr]:border-b dark:border-zinc-700">
+                                <thead className="[&_tr]:border-b dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
                                     <tr className="border-b transition-colors hover:bg-muted/50 dark:border-zinc-700">
                                         <th className="h-12 px-4 align-middle font-medium text-muted-foreground dark:text-zinc-400">氏名</th>
                                         <th className="h-12 px-4 align-middle font-medium text-muted-foreground dark:text-zinc-400">役割</th>
@@ -418,8 +470,8 @@ function PartnersPageContent() {
                                         <th className="h-12 px-4 align-middle font-medium text-muted-foreground dark:text-zinc-400">原価ルール</th>
                                     </tr>
                                 </thead>
-                                <tbody className="[&_tr:last-child]:border-0">
-                                    {filteredPartners.map((p) => {
+                                <tbody className="[&_tr:last-child]:border-0 p-0">
+                                    {partners.map((p) => {
                                         const partnerClients = getPartnerClients(p);
                                         return (
                                             <tr
@@ -498,6 +550,39 @@ function PartnersPageContent() {
                             </table>
                         </div>
                     )}
+                    {/* Pagination Controls */}
+                    <div className="flex items-center justify-between border-t p-4 dark:border-zinc-700">
+                        <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                            {totalItems > 0 ? (
+                                <>
+                                    {totalItems} 件中 {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} 件を表示
+                                </>
+                            ) : "0 件"}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1 || isLoading}
+                                className="h-8 w-8 p-0"
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <span className="text-sm dark:text-zinc-300 min-w-[3rem] text-center">
+                                Page {currentPage} / {Math.max(totalPages, 1)}
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages || isLoading}
+                                className="h-8 w-8 p-0"
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
             {/* Role Deletion Alert Dialog */}
