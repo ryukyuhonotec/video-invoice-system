@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { getClients, upsertClient, getStaff, getPricingRules, getPartners } from "@/actions/pricing-actions";
 import { Client, Staff, PricingRule, Partner } from "@/types";
 import { Search, Plus, Filter, ExternalLink } from "lucide-react";
@@ -21,7 +22,7 @@ export default function ClientsPage() {
     const [partners, setPartners] = useState<Partner[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
-    const [editingClient, setEditingClient] = useState<Partial<Client>>({});
+    const [editingClient, setEditingClient] = useState<Partial<Client> & { partnerIds?: string[] }>({});
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedOpsId, setSelectedOpsId] = useState<string>("ALL");
     const [selectedAccId, setSelectedAccId] = useState<string>("ALL");
@@ -53,7 +54,8 @@ export default function ClientsPage() {
             chatworkGroup: "",
             description: "",
             operationsLeadId: "",
-            accountantId: ""
+            accountantId: "",
+            partnerIds: []
         });
         setIsEditing(true);
     };
@@ -68,6 +70,17 @@ export default function ClientsPage() {
 
         setIsEditing(false);
         setIsLoading(false);
+    };
+
+    const togglePartner = (partnerId: string, isChecked: boolean) => {
+        const currentIds = editingClient.partnerIds || [];
+        let newIds = [];
+        if (isChecked) {
+            newIds = [...currentIds, partnerId];
+        } else {
+            newIds = currentIds.filter(id => id !== partnerId);
+        }
+        setEditingClient({ ...editingClient, partnerIds: newIds });
     };
 
     // Filter clients based on search query and selected partner
@@ -293,6 +306,17 @@ export default function ClientsPage() {
                                         このクライアントをアーカイブする
                                     </label>
                                 </div>
+                            </div>
+
+                            <div className="col-span-2 space-y-2">
+                                <Label className="dark:text-zinc-300">担当パートナー</Label>
+                                <SearchableMultiSelect
+                                    options={partners.map(p => ({ label: p.name, value: p.id }))}
+                                    selected={editingClient.partnerIds || []}
+                                    onChange={(ids) => setEditingClient({ ...editingClient, partnerIds: ids })}
+                                    placeholder="パートナーを選択..."
+                                    className="dark:bg-zinc-800"
+                                />
                             </div>
 
                             {/* Contract Status */}

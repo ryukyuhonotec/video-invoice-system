@@ -27,6 +27,7 @@ export interface PricingRule {
 
     clients?: Client[];
     partners?: Partner[];
+    targetRole?: string; // NEW: Role based filtering (e.g. "EDITOR", "DESIGNER")
     isDefault: boolean;
 }
 
@@ -52,6 +53,7 @@ export interface Client {
     sns2?: string;
     sns3?: string;
     pricingRules?: PricingRule[];
+    partners?: Partner[]; // NEW: Direct Client-Partner links
     contractSigned?: boolean;
     contractUrl?: string;
 }
@@ -65,6 +67,7 @@ export interface Partner {
     position?: string;
     description?: string;
     pricingRules?: PricingRule[];
+    clients?: Client[]; // NEW: Direct Client-Partner links
     outsources?: Outsource[];
     isArchived?: boolean;
     contractSigned?: boolean;
@@ -112,8 +115,8 @@ export interface Staff {
     role: 'OPERATIONS' | 'ACCOUNTING';
 }
 
-export type InvoiceStatus = 'DRAFT' | 'Unbilled' | 'Billed' | 'Paid' | '請求済' | '入金済み' | '受注前' | '進行中' | '制作中' | '確認中' | '納品済' | '請求書作成済' | '送付済' | '完了' | '失注';
-export type ProductionStatus = '受注前' | '制作中' | '確認中' | '納品済' | '請求済' | '入金済み' | 'Pre-Order' | 'In Progress' | 'Review' | 'Delivered';
+export type InvoiceStatus = 'DRAFT' | 'Unbilled' | 'Billed' | 'Paid' | '請求済' | '入金済み' | '受注前' | '進行中' | '制作中' | '修正中' | '確認中' | '納品済' | '請求書作成済' | '送付済' | '完了' | '失注';
+export type ProductionStatus = '受注前' | '制作中' | '修正中' | '確認中' | '納品済' | '請求済' | '入金済み' | 'Pre-Order' | 'In Progress' | 'Review' | 'Delivered';
 
 export interface InvoiceItem {
     id: string;

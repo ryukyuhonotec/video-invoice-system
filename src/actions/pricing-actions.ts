@@ -33,7 +33,19 @@ export async function addPartnerRole(name: string) {
     }
 }
 
+export async function deletePartnerRole(id: string) {
+    try {
+        await prisma.partnerRole.delete({ where: { id } });
+        revalidatePath("/partners");
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { success: false, error: "Failed to delete role" };
+    }
+}
+
 // --- Clients ---
+
 export async function getClients() {
     console.log("API: getClients starting...");
     try {
@@ -47,6 +59,7 @@ export async function getClients() {
                 billingContact: true,
                 operationsLead: true,
                 accountant: true,
+                partners: true, // NEW: Direct Client-Partner links
             },
             orderBy: { updatedAt: 'desc' },
         });
@@ -59,7 +72,10 @@ export async function getClients() {
 }
 
 export async function upsertClient(data: any) {
-    const { id, pricingRules, billingContact, ...rest } = data;
+    const { id, pricingRules, billingContact, partnerIds, ...rest } = data;
+
+    // Partners relation
+    const partnerConnect = partnerIds?.map((pid: string) => ({ id: pid })) || [];
 
     // Convert empty strings to null for optional foreign key fields
     if (rest.operationsLeadId === "") rest.operationsLeadId = null;
@@ -69,10 +85,14 @@ export async function upsertClient(data: any) {
     const isNew = !id || id.startsWith('new-');
     const result = await prisma.client.upsert({
         where: { id: id || 'new' },
-        update: rest,
+        update: {
+            ...rest,
+            partners: { set: partnerConnect }
+        },
         create: {
             ...rest,
             id: id && !id.startsWith('new-') ? id : undefined,
+            partners: { connect: partnerConnect }
         },
     });
 
@@ -183,6 +203,7 @@ export async function getPartners() {
                         }
                     }
                 },
+                clients: true, // NEW: Direct Client-Partner links
             } as any,
             orderBy: { updatedAt: 'desc' },
         });
@@ -194,13 +215,28 @@ export async function getPartners() {
 }
 
 export async function upsertPartner(data: any) {
-    const { id, pricingRules, assignedItems, billingClients, ...rest } = data;
+    const { id, pricingRules, assignedItems, billingClients, clientIds, ...rest } = data;
+
+    // Clients relation
+    const clientConnect = clientIds?.map((cid: string) => ({ id: cid })) || [];
+
+    // Handle specific fields cleanup
+    if (rest.email === "") rest.email = null;
+    if (rest.chatworkGroup === "") rest.chatworkGroup = null;
+    if (rest.position === "") rest.position = null;
+    if (rest.description === "") rest.description = null;
+    if (rest.contractUrl === "") rest.contractUrl = null;
+
     const result = await prisma.partner.upsert({
         where: { id: id || 'new' },
-        update: rest,
+        update: {
+            ...rest,
+            clients: { set: clientConnect }
+        },
         create: {
             ...rest,
             id: id && !id.startsWith('p-new-') ? id : undefined,
+            clients: { connect: clientConnect }
         },
     });
     revalidatePath('/partners');
@@ -543,7 +579,8 @@ export async function getClientStats(clientId: string) {
     const client = await prisma.client.findUnique({
         where: { id: clientId },
         include: {
-            pricingRules: true
+            pricingRules: true,
+            partners: true
         }
     });
 

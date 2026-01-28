@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { getPricingRules, upsertPricingRule, deletePricingRule, getClients, getPartners } from "@/actions/pricing-actions";
 import { PricingRule, Client, Partner, PricingType, PricingStep } from "@/types";
 import { Search, Plus } from "lucide-react";
@@ -19,6 +20,7 @@ export default function PricingRulesPage() {
     const [isPartnerListOpen, setIsPartnerListOpen] = useState(false);
 
     const [isEditing, setIsEditing] = useState(false);
+    const [scope, setScope] = useState<"GENERIC" | "INDIVIDUAL">("GENERIC");
     const [editingRule, setEditingRule] = useState<Partial<PricingRule> & { clientIds?: string[], partnerIds?: string[] }>({
         type: 'FIXED',
         isDefault: false,
@@ -47,6 +49,7 @@ export default function PricingRulesPage() {
     }, []);
 
     const handleAddNew = () => {
+        setScope("GENERIC");
         setEditingRule({
             name: "",
             type: 'FIXED',
@@ -75,12 +78,16 @@ export default function PricingRulesPage() {
             }
         }
 
+        const clientIds = rule.clients?.map(c => c.id) || [];
+        const partnerIds = rule.partners?.map(p => p.id) || [];
+
+        setScope((clientIds.length > 0 || partnerIds.length > 0) ? "INDIVIDUAL" : "GENERIC");
         setEditingRule({
             ...rule,
             steps: parsedSteps,
             costSteps: parsedCostSteps,
-            clientIds: rule.clients?.map(c => c.id) || [],
-            partnerIds: rule.partners?.map(p => p.id) || []
+            clientIds,
+            partnerIds
         });
         setIsEditing(true);
     };
@@ -89,7 +96,13 @@ export default function PricingRulesPage() {
         if (!editingRule.name) return;
 
         setIsLoading(true);
-        await upsertPricingRule(editingRule);
+        const ruleToSave = { ...editingRule };
+        if (scope === "GENERIC") {
+            ruleToSave.clientIds = [];
+            ruleToSave.partnerIds = [];
+        }
+
+        await upsertPricingRule(ruleToSave);
         const updatedRules = await getPricingRules();
         setRules(updatedRules as any);
         setIsEditing(false);
@@ -185,56 +198,53 @@ export default function PricingRulesPage() {
                             </div>
                         </div>
 
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <div className="space-y-2 relative">
-                                <Label className="font-bold text-blue-700 dark:text-blue-400">適用先クライアント (売上ルール)</Label>
-                                <div className="border rounded-md bg-white dark:bg-zinc-900 dark:border-zinc-700 shadow-inner">
-                                    <div className="p-3 border-b dark:border-zinc-700 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800" onClick={() => setIsClientListOpen(!isClientListOpen)}>
-                                        <span className={`text-sm font-bold ${editingRule.clientIds?.length ? 'text-blue-700 dark:text-blue-400' : 'text-zinc-600 dark:text-zinc-400'}`}>
-                                            {editingRule.clientIds?.length ? `${editingRule.clientIds.length}社 選択中` : "選択してください"}
-                                        </span>
-                                        <Button size="sm" variant="ghost" className="h-6 text-xs text-blue-500">{isClientListOpen ? "閉じる" : "開く"}</Button>
-                                    </div>
-                                    {isClientListOpen && (
-                                        <div className="p-2">
-                                            <Input className="h-9 mb-2 dark:bg-zinc-800 dark:text-zinc-100" placeholder="検索..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} />
-                                            <div className="max-h-48 overflow-y-auto p-1 space-y-1 bg-zinc-50 dark:bg-zinc-900">
-                                                {clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase())).map(c => (
-                                                    <div key={c.id} className={`flex items-center gap-2 p-2 rounded border transition-colors cursor-pointer ${editingRule.clientIds?.includes(c.id) ? 'bg-blue-100 border-blue-400 text-blue-900 shadow-sm dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700' : 'bg-white border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:hover:bg-zinc-700 dark:text-zinc-300'}`} onClick={() => toggleClientId(c.id)}>
-                                                        <input type="checkbox" checked={editingRule.clientIds?.includes(c.id)} onChange={() => { }} className="h-4 w-4 rounded border-zinc-300 text-blue-600" />
-                                                        <span className="text-sm font-medium">{c.name}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                        {/* Type & Scope Selection */}
+                        <div className="grid gap-6 md:grid-cols-2 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border dark:border-zinc-700">
+                            <div className="space-y-2">
+                                <Label className="font-bold dark:text-zinc-200">料金タイプ</Label>
+                                <Select value={editingRule.type} onChange={e => setEditingRule({ ...editingRule, type: e.target.value as PricingType })}>
+                                    <option value="FIXED">固定料金 (Fixed)</option>
+                                    <option value="STEPPED">階段式 (Stepped)</option>
+                                    <option value="LINEAR">従量課金 (Linear)</option>
+                                </Select>
                             </div>
-                            <div className="space-y-2 relative">
-                                <Label className="font-bold text-purple-700 dark:text-purple-400">適用先パートナー (原価ルール)</Label>
-                                <div className="border rounded-md bg-white dark:bg-zinc-900 dark:border-zinc-700 shadow-inner">
-                                    <div className="p-3 border-b dark:border-zinc-700 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800" onClick={() => setIsPartnerListOpen(!isPartnerListOpen)}>
-                                        <span className={`text-sm font-bold ${editingRule.partnerIds?.length ? 'text-purple-700 dark:text-purple-400' : 'text-zinc-600 dark:text-zinc-400'}`}>
-                                            {editingRule.partnerIds?.length ? `${editingRule.partnerIds.length}名 選択中` : "選択してください"}
-                                        </span>
-                                        <Button size="sm" variant="ghost" className="h-6 text-xs text-blue-500">{isPartnerListOpen ? "閉じる" : "開く"}</Button>
-                                    </div>
-                                    {isPartnerListOpen && (
-                                        <div className="p-2">
-                                            <Input className="h-9 mb-2 dark:bg-zinc-800 dark:text-zinc-100" placeholder="検索..." value={partnerSearch} onChange={e => setPartnerSearch(e.target.value)} />
-                                            <div className="max-h-48 overflow-y-auto p-1 space-y-1 bg-zinc-50 dark:bg-zinc-900">
-                                                {partners.filter(p => p.name.toLowerCase().includes(partnerSearch.toLowerCase())).map(p => (
-                                                    <div key={p.id} className={`flex items-center gap-2 p-2 rounded border transition-colors cursor-pointer ${editingRule.partnerIds?.includes(p.id) ? 'bg-purple-100 border-purple-400 text-purple-900 shadow-sm dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700' : 'bg-white border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:hover:bg-zinc-700 dark:text-zinc-300'}`} onClick={() => togglePartnerId(p.id)}>
-                                                        <input type="checkbox" checked={editingRule.partnerIds?.includes(p.id)} onChange={() => { }} className="h-4 w-4 rounded border-zinc-300 text-purple-600" />
-                                                        <span className="text-sm font-medium">{p.name}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                            <div className="space-y-2">
+                                <Label className="font-bold dark:text-zinc-200">適用範囲 (Scope)</Label>
+                                <Select
+                                    value={scope}
+                                    onChange={e => setScope(e.target.value as "GENERIC" | "INDIVIDUAL")}
+                                >
+                                    <option value="GENERIC">汎用ルール (Generic)</option>
+                                    <option value="INDIVIDUAL">個別指定 (Individual)</option>
+                                </Select>
                             </div>
                         </div>
+
+                        {/* Individual Selectors */}
+                        {scope === "INDIVIDUAL" && (
+                            <div className="grid gap-6 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label className="font-bold text-blue-700 dark:text-blue-400">適用先クライアント (売上ルール)</Label>
+                                    <SearchableMultiSelect
+                                        options={clients.map(c => ({ label: c.name, value: c.id }))}
+                                        selected={editingRule.clientIds || []}
+                                        onChange={(ids) => setEditingRule({ ...editingRule, clientIds: ids })}
+                                        placeholder="クライアントを選択..."
+                                        className="bg-white dark:bg-zinc-900"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="font-bold text-purple-700 dark:text-purple-400">適用先パートナー (原価ルール)</Label>
+                                    <SearchableMultiSelect
+                                        options={partners.map(p => ({ label: p.name, value: p.id }))}
+                                        selected={editingRule.partnerIds || []}
+                                        onChange={(ids) => setEditingRule({ ...editingRule, partnerIds: ids })}
+                                        placeholder="パートナーを選択..."
+                                        className="bg-white dark:bg-zinc-900"
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid gap-6 md:grid-cols-2">
                             <div className="space-y-4 border p-4 rounded-lg bg-white dark:bg-zinc-900 dark:border-zinc-700 shadow-sm">
@@ -242,14 +252,6 @@ export default function PricingRulesPage() {
                                     受注価格設定 (Revenue)
                                 </h3>
                                 <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label className="dark:text-zinc-200">料金タイプ</Label>
-                                        <Select value={editingRule.type} onChange={e => setEditingRule({ ...editingRule, type: e.target.value as PricingType })}>
-                                            <option value="FIXED">固定料金</option>
-                                            <option value="STEPPED">階段式 (尺に応じる)</option>
-                                            <option value="LINEAR">従量課金 (尺に比例)</option>
-                                        </Select>
-                                    </div>
                                     {editingRule.type === 'FIXED' && (
                                         <div className="space-y-2">
                                             <Label className="dark:text-zinc-200">売上単価 (円)</Label>
@@ -345,10 +347,6 @@ export default function PricingRulesPage() {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <input type="checkbox" id="isDefault" checked={editingRule.isDefault || false} onChange={e => setEditingRule({ ...editingRule, isDefault: e.target.checked })} />
-                            <Label htmlFor="isDefault" className="dark:text-zinc-200">デフォルトルールとして設定</Label>
-                        </div>
 
                         <div className="flex justify-end gap-2 border-t pt-4">
                             <Button variant="ghost" onClick={() => setIsEditing(false)}>キャンセル</Button>

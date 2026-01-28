@@ -169,12 +169,24 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
 
     const selectedClient = useMemo(() => clients.find(c => c.id === selectedClientId), [clients, selectedClientId]);
 
-    // Available rules for selected client (client-specific + default)
+    // Available rules for selected client (client-specific + generic)
     const availableRules = useMemo(() => {
         return pricingRules.filter(r =>
-            (r.clients?.some(c => c.id === selectedClientId) || (!r.clients?.length && r.isDefault))
+            // Rule is assigned to this client OR Rule has no assigned clients (Generic)
+            (r.clients?.some(c => c.id === selectedClientId) || !r.clients?.length)
         );
     }, [pricingRules, selectedClientId]);
+
+    // Available partners for selected client
+    const availablePartners = useMemo(() => {
+        if (!selectedClientId) return partners;
+        // Strict filtering: Only partners linked to the client
+        // If client object isn't fully loaded with partners yet (should be via getClients include), fallback to empty or check
+        // We know selectedClient comes from clients array which uses getClients incl partners.
+        return selectedClient?.partners?.length ? selectedClient.partners : [];
+        // Note: If a client has NO linked partners, this returns empty. 
+        // This is per requirements ("Display only partners linked to the client").
+    }, [partners, selectedClient, selectedClientId]);
 
     // Operations staff only
     const operationsStaff = useMemo(() => staffList.filter(s => s.role === 'OPERATIONS'), [staffList]);
@@ -618,7 +630,7 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                             updateTask={updateTask}
                             handleRemoveTask={handleRemoveTask}
                             pricingRules={pricingRules}
-                            partners={partners}
+                            partners={availablePartners}
                             availableRules={availableRules}
                             canDeleteItem={items.length > 1}
                             errors={validationErrors}

@@ -12,6 +12,7 @@ export const InvoiceStatusEnum = {
 export const TaskStatusEnum = {
     PRE_ORDER: '受注前',
     IN_PROGRESS: '制作中',
+    CORRECTION: '修正中', // Added
     REVIEW: '確認中',
     DELIVERED: '納品済',
     BILLED: '請求済',

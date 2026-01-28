@@ -9,9 +9,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getPartners, upsertPartner, getPartnerRoles, addPartnerRole } from "@/actions/pricing-actions";
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { getPartnerRoles, getPartners, upsertPartner, deletePartnerRole, getClients, addPartnerRole } from "@/actions/pricing-actions";
 import { Partner, PartnerRole } from "@/types";
-import { Search, Plus, Archive, AlertCircle, ExternalLink } from "lucide-react";
+import { Search, Plus, Archive, AlertCircle, ExternalLink, Trash2 } from "lucide-react";
 
 export default function PartnersPage() {
     return (
@@ -24,28 +35,31 @@ export default function PartnersPage() {
 function PartnersPageContent() {
     const router = useRouter();
     const [partners, setPartners] = useState<Partner[]>([]);
-    const [roles, setRoles] = useState<PartnerRole[]>([]); // Added roles state
+    const [roles, setRoles] = useState<PartnerRole[]>([]);
+    const [clients, setClients] = useState<any[]>([]); // Added clients state
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
-    const [editingPartner, setEditingPartner] = useState<Partial<Partner>>({});
+    const [editingPartner, setEditingPartner] = useState<Partial<Partner> & { clientIds?: string[] }>({}); // Added clientIds type
     const [searchQuery, setSearchQuery] = useState("");
     const [showArchived, setShowArchived] = useState(false);
     const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>("ALL");
 
-    // New Role Creation State
     const [newRoleName, setNewRoleName] = useState("");
     const [isAddingRole, setIsAddingRole] = useState(false);
+    const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
 
     const searchParams = useSearchParams();
 
     useEffect(() => {
         const loadData = async () => {
-            const [pData, rData] = await Promise.all([
+            const [pData, rData, cData] = await Promise.all([
                 getPartners(),
-                getPartnerRoles()
+                getPartnerRoles(),
+                getClients()
             ]);
             setPartners(pData as any);
             setRoles(rData as any);
+            setClients(cData as any);
             setIsLoading(false);
 
             // Handle edit param
@@ -53,7 +67,10 @@ function PartnersPageContent() {
             if (editId && pData) {
                 const target = (pData as any).find((p: any) => p.id === editId);
                 if (target) {
-                    setEditingPartner(target);
+                    setEditingPartner({
+                        ...target,
+                        clientIds: target.clients?.map((c: any) => c.id) || []
+                    });
                     setIsEditing(true);
                     // Clear param
                     router.replace('/partners');
@@ -64,7 +81,14 @@ function PartnersPageContent() {
     }, [searchParams]);
 
     const handleAddNew = () => {
-        setEditingPartner({ name: "", role: "運用者", email: "", chatworkGroup: "", position: "", description: "" });
+        setEditingPartner({
+            name: "",
+            role: "運用者",
+            email: "",
+            chatworkGroup: "",
+            description: "",
+            clientIds: [] // Initialize empty
+        });
         setIsEditing(true);
     };
 
@@ -95,6 +119,27 @@ function PartnersPageContent() {
         setIsAddingRole(false);
     };
 
+    const handleDeleteRole = (id: string, e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        setRoleToDelete(id);
+    };
+
+    const executeDeleteRole = async () => {
+        if (!roleToDelete) return;
+
+        const res = await deletePartnerRole(roleToDelete);
+        if (res?.success) {
+            const rData = await getPartnerRoles();
+            setRoles(rData as any);
+        } else {
+            alert("役割の削除に失敗しました");
+        }
+        setRoleToDelete(null);
+    };
+
     const toggleRole = (roleName: string, isChecked: boolean) => {
         const currentRoles = (editingPartner.role || "").split(",").filter(r => r.trim() !== "");
         let newRoles = [];
@@ -104,6 +149,17 @@ function PartnersPageContent() {
             newRoles = currentRoles.filter(r => r !== roleName);
         }
         setEditingPartner({ ...editingPartner, role: newRoles.join(",") });
+    };
+
+    const toggleClient = (clientId: string, isChecked: boolean) => {
+        const currentIds = editingPartner.clientIds || [];
+        let newIds = [];
+        if (isChecked) {
+            newIds = [...currentIds, clientId];
+        } else {
+            newIds = currentIds.filter(id => id !== clientId);
+        }
+        setEditingPartner({ ...editingPartner, clientIds: newIds });
     };
 
     // Filter partners based on search query and role filter
@@ -170,18 +226,29 @@ function PartnersPageContent() {
                                 <div className="p-3 border rounded-md dark:border-zinc-700 space-y-3 bg-zinc-50 dark:bg-zinc-800/50 max-h-48 overflow-y-auto">
                                     <div className="grid grid-cols-2 gap-2">
                                         {roles.map(role => (
-                                            <div key={role.id} className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id={`role-${role.id}`}
-                                                    checked={(editingPartner.role || "").split(",").includes(role.name)}
-                                                    onCheckedChange={(checked) => toggleRole(role.name, checked as boolean)}
-                                                />
-                                                <label
-                                                    htmlFor={`role-${role.id}`}
-                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-zinc-300 cursor-pointer"
+                                            <div key={role.id} className="flex items-center justify-between space-x-2 group">
+                                                <div className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`role-${role.id}`}
+                                                        checked={(editingPartner.role || "").split(",").includes(role.name)}
+                                                        onCheckedChange={(checked) => toggleRole(role.name, checked as boolean)}
+                                                    />
+                                                    <label
+                                                        htmlFor={`role-${role.id}`}
+                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-zinc-300 cursor-pointer"
+                                                    >
+                                                        {role.name}
+                                                    </label>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={(e) => handleDeleteRole(role.id, e)}
                                                 >
-                                                    {role.name}
-                                                </label>
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
                                             </div>
                                         ))}
                                     </div>
@@ -219,11 +286,12 @@ function PartnersPageContent() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">役職</Label>
-                                <Input
-                                    value={editingPartner.position || ""}
-                                    onChange={e => setEditingPartner({ ...editingPartner, position: e.target.value })}
-                                    placeholder="CEO / マネージャー"
+                                <Label className="dark:text-zinc-300">担当クライアント</Label>
+                                <SearchableMultiSelect
+                                    options={clients.map(c => ({ label: c.name, value: c.id }))}
+                                    selected={editingPartner.clientIds || []}
+                                    onChange={(ids) => setEditingPartner({ ...editingPartner, clientIds: ids })}
+                                    placeholder="クライアントを選択..."
                                     className="dark:bg-zinc-800"
                                 />
                             </div>
@@ -432,6 +500,21 @@ function PartnersPageContent() {
                     )}
                 </CardContent>
             </Card>
-        </div >
+            {/* Role Deletion Alert Dialog */}
+            <AlertDialog open={!!roleToDelete} onOpenChange={(open) => !open && setRoleToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>役割の削除</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            この役割を削除してもよろしいですか？この操作は取り消せません。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                        <AlertDialogAction onClick={executeDeleteRole} className="bg-red-600 hover:bg-red-700">削除する</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
     );
 }

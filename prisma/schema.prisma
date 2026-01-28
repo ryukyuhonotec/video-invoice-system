@@ -36,6 +36,7 @@ model Client {
   sns2            String?
   sns3            String?
 
+  partners        Partner[] @relation("ClientPartners")
   pricingRules    PricingRule[] @relation("ClientPricingRules")
   invoices        Invoice[]
   bills           Bill[]
@@ -71,6 +72,7 @@ model Partner {
   description   String? // 備考
   
   pricingRules  PricingRule[] @relation("PartnerCostRules")
+  clients       Client[]      @relation("ClientPartners")
   outsources    Outsource[]
   billingClients Client[] @relation("ClientBillingContact")
   
@@ -146,6 +148,8 @@ model PricingRule {
   // Relations - M:N
   clients     Client[]  @relation("ClientPricingRules")
   partners    Partner[] @relation("PartnerCostRules")
+  
+  targetRole  String?   // NEW: Role based filtering (e.g. "EDITOR", "DESIGNER")
   
   isDefault   Boolean  @default(false)
   

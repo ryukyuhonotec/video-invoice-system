@@ -19,6 +19,17 @@ async function seedData() {
 
     console.log("Seeding data...");
 
+    // 0. Seed User (for login/audit)
+    const user = await prisma.user.upsert({
+        where: { email: "admin@example.com" },
+        update: {},
+        create: {
+            name: "Admin User",
+            email: "admin@example.com",
+            role: "OWNER",
+        }
+    });
+
     // 0. Seed Staff (for client assignment)
     const staffData = [
         { id: "staff-ops-1", name: "山田 太郎", email: "yamada@example.com", role: "OPERATIONS" },
@@ -81,8 +92,10 @@ async function seedData() {
             fixedPrice: 150000,
             fixedCost: 80000,
             isDefault: true,
-            clients: { connect: [{ id: "c1" }, { id: "c2" }] },
-            partners: { connect: [{ id: "p1" }] }
+            // Generic rule, no targetRole (or maybe 'DIRECTOR'?)
+            targetRole: "ディレクター",
+            clients: { connect: [{ id: "c1" }, { id: "c2" }] }
+            // No strict partner connection for standard rule to test role filtering
         }
     });
 
@@ -96,8 +109,8 @@ async function seedData() {
             steps: JSON.stringify([{ upTo: 5, price: 50000 }, { upTo: 10, price: 90000 }, { upTo: 30, price: 200000 }]),
             costSteps: JSON.stringify([{ upTo: 5, price: 30000 }, { upTo: 10, price: 50000 }, { upTo: 30, price: 120000 }]),
             isDefault: false,
-            clients: { connect: [{ id: "c3" }] },
-            partners: { connect: [{ id: "p2" }, { id: "p4" }] }
+            targetRole: "エディター", // Only for editors
+            clients: { connect: [{ id: "c3" }] }
         }
     });
 
@@ -111,7 +124,29 @@ async function seedData() {
             fixedPrice: 300000,
             fixedCost: 180000,
             isDefault: false,
+            targetRole: "カメラマン",
             clients: { connect: [{ id: "c4" }, { id: "c5" }] }
+        }
+    });
+
+    // Connect Clients and Partners manually for testing
+    // C1 (Retail) -> P1 (Director), P4 (Editor)
+    await prisma.client.update({
+        where: { id: "c1" },
+        data: {
+            partners: {
+                connect: [{ id: "p1" }, { id: "p4" }]
+            }
+        }
+    });
+
+    // C3 (Edu) -> P2 (Cameraman), P4 (Editor)
+    await prisma.client.update({
+        where: { id: "c3" },
+        data: {
+            partners: {
+                connect: [{ id: "p2" }, { id: "p4" }]
+            }
         }
     });
 
@@ -137,6 +172,7 @@ async function seedData() {
         await prisma.invoice.create({
             data: {
                 clientId: client.id,
+                createdById: user.id, // Link to admin user
                 status: isDelivered ? (status === "請求済" || status === "入金済み" ? "Billed" : "Unbilled") : "DRAFT",
                 issueDate: issueDate,
                 // Invoice level delivery date

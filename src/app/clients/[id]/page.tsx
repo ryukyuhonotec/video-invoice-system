@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { getClientStats, upsertClient, getStaff } from "@/actions/pricing-actions";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
+import { getClientStats, upsertClient, getStaff, getPartners } from "@/actions/pricing-actions";
 import { ArrowLeft, Building2, ExternalLink, Edit, Save, X, Link2 } from "lucide-react";
 import Link from "next/link";
 
@@ -55,6 +57,7 @@ export default function ClientDetailPage() {
     const router = useRouter();
     const [data, setData] = useState<any>(null);
     const [staffList, setStaffList] = useState<any[]>([]);
+    const [partners, setPartners] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -64,12 +67,14 @@ export default function ClientDetailPage() {
         const load = async () => {
             if (params.id) {
                 try {
-                    const [res, staff] = await Promise.all([
+                    const [res, staff, partnerData] = await Promise.all([
                         getClientStats(params.id as string),
-                        getStaff()
+                        getStaff(),
+                        getPartners()
                     ]);
                     setData(res);
                     setStaffList(staff);
+                    setPartners(partnerData as any);
                 } catch (e) {
                     console.error(e);
                 } finally {
@@ -81,8 +86,22 @@ export default function ClientDetailPage() {
     }, [params.id]);
 
     const handleEdit = () => {
-        setEditData({ ...data.client });
+        setEditData({
+            ...data.client,
+            partnerIds: data.client.partners?.map((p: any) => p.id) || []
+        });
         setIsEditing(true);
+    };
+
+    const togglePartner = (partnerId: string, isChecked: boolean) => {
+        const currentIds = editData.partnerIds || [];
+        let newIds = [];
+        if (isChecked) {
+            newIds = [...currentIds, partnerId];
+        } else {
+            newIds = currentIds.filter((id: string) => id !== partnerId);
+        }
+        setEditData({ ...editData, partnerIds: newIds });
     };
 
     const handleCancel = () => {
@@ -253,6 +272,16 @@ export default function ClientDetailPage() {
                                         onChange={e => setEditData({ ...editData, description: e.target.value })}
                                     />
                                 </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-zinc-500">担当パートナー</Label>
+                                    <SearchableMultiSelect
+                                        options={partners.map(p => ({ label: p.name, value: p.id }))}
+                                        selected={editData.partnerIds || []}
+                                        onChange={(ids) => setEditData({ ...editData, partnerIds: ids })}
+                                        placeholder="パートナーを選択..."
+                                        className="dark:bg-zinc-800"
+                                    />
+                                </div>
                             </CardContent>
                         </Card>
                     ) : (
@@ -288,6 +317,20 @@ export default function ClientDetailPage() {
                                     <div className="text-zinc-500 dark:text-zinc-400 mb-1">備考</div>
                                     <div className="whitespace-pre-wrap text-zinc-700 bg-zinc-50 p-2 rounded dark:bg-zinc-800 dark:text-zinc-300">
                                         {client.description || "なし"}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-zinc-500 dark:text-zinc-400 mb-1">担当パートナー</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {client.partners && client.partners.length > 0 ? (
+                                            client.partners.map((p: any) => (
+                                                <span key={p.id} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded dark:bg-green-900/40 dark:text-green-300">
+                                                    {p.name}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="text-zinc-400 dark:text-zinc-500">-</span>
+                                        )}
                                     </div>
                                 </div>
                             </CardContent>
