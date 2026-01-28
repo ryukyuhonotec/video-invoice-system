@@ -180,12 +180,16 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
     // Available partners for selected client
     const availablePartners = useMemo(() => {
         if (!selectedClientId) return partners;
-        // Strict filtering: Only partners linked to the client
-        // If client object isn't fully loaded with partners yet (should be via getClients include), fallback to empty or check
-        // We know selectedClient comes from clients array which uses getClients incl partners.
-        return selectedClient?.partners?.length ? selectedClient.partners : [];
-        // Note: If a client has NO linked partners, this returns empty. 
-        // This is per requirements ("Display only partners linked to the client").
+
+        // Fix for Issue #6: If client has linked partners, show them.
+        // If NO partners are linked (common in initial setup/migration), show ALL partners.
+        // This prevents the "Empty Dropdown" blocker.
+        const linkedPartners = selectedClient?.partners || [];
+        if (linkedPartners.length > 0) {
+            return linkedPartners;
+        }
+
+        return partners;
     }, [partners, selectedClient, selectedClientId]);
 
     // Operations staff only
@@ -511,6 +515,31 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Error Summary (Fix #2) */}
+            {Object.keys(validationErrors).length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 text-red-700 font-bold mb-2">
+                        <AlertCircle className="w-5 h-5" />
+                        <span>入力エラーがあります</span>
+                    </div>
+                    <ul className="list-disc list-inside text-sm text-red-600 space-y-1">
+                        {validationErrors['clientId'] && <li>クライアントを選択してください</li>}
+                        {Object.entries(validationErrors).map(([key, msg]) => {
+                            if (key === 'clientId') return null;
+                            const match = key.match(/items\.(\d+)\.name/);
+                            if (match) return <li key={key}>品目 {Number(match[1]) + 1}: {msg}</li>;
+
+                            const taskMatch = key.match(/items\.(\d+)\.outsources\.(\d+)\.(.+)/);
+                            if (taskMatch) {
+                                const [_, itemIdx, taskIdx] = taskMatch;
+                                return <li key={key}>品目 {Number(itemIdx) + 1} - タスク {Number(taskIdx) + 1}: {msg}</li>;
+                            }
+                            return <li key={key}>{msg}</li>;
+                        })}
+                    </ul>
+                </div>
+            )}
 
             {/* ===== STEP 1: 案件登録 ===== */}
             <Card className="border-l-4 border-l-blue-500 shadow-lg overflow-hidden">

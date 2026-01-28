@@ -37,7 +37,8 @@ export interface Client {
     code?: string;
     email?: string;
     chatworkGroup?: string;
-    billingContact?: string;
+    billingContactId?: string;
+    billingContact?: Partner;
     website?: string;
     contactPerson?: string;
     description?: string;

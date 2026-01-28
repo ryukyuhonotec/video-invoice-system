@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Trash2, CheckCircle2 } from "lucide-react";
 import { Outsource, Partner, PricingRule } from "@/types";
 import { TaskStatusEnum } from "@/config/constants";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface OutsourceTaskRowProps {
     task: Outsource;
@@ -101,29 +102,26 @@ export function OutsourceTaskRow({
                 {/* Pricing Rule */}
                 <div className="col-span-12 md:col-span-4 space-y-1">
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase">料金ルール（担当領域）</Label>
-                    <Select
+                    <SearchableSelect
                         className={`text-xs h-9 bg-white ${ruleError ? "border-red-500" : ""}`}
                         value={task.pricingRuleId || ""}
-                        onChange={(e) => updateTask(itemIndex, taskIndex, 'pricingRuleId', e.target.value)}
-                    >
-                        <option value="">選択...</option>
-                        {availableRules.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                    </Select>
+                        onChange={(val) => updateTask(itemIndex, taskIndex, 'pricingRuleId', val)}
+                        options={availableRules.map(r => ({ label: r.name, value: r.id }))}
+                        placeholder="ルールを選択..."
+                    />
                 </div>
 
                 {/* Partner */}
                 <div className="col-span-12 md:col-span-4 space-y-1">
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase">パートナー</Label>
-                    <Select
+                    <SearchableSelect
                         className="text-xs h-9 bg-white"
                         value={task.partnerId || ""}
-                        onChange={(e) => updateTask(itemIndex, taskIndex, 'partnerId', e.target.value)}
+                        onChange={(val) => updateTask(itemIndex, taskIndex, 'partnerId', val)}
                         disabled={!task.pricingRuleId}
-                    >
-                        <option value="">選択...</option>
-                        {/* Show filtered partners */}
-                        {finalPartnerOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </Select>
+                        options={finalPartnerOptions.map(p => ({ label: p.name, value: p.id }))}
+                        placeholder="パートナーを選択..."
+                    />
                 </div>
 
                 {/* Status */}
