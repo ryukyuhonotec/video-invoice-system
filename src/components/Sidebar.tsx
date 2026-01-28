@@ -11,7 +11,9 @@ import {
     FileText,
     Settings,
     Building2,
-    ShieldCheck
+    ShieldCheck,
+    TrendingUp,
+    HelpCircle
 } from "lucide-react";
 
 const menuItems = [
@@ -20,11 +22,13 @@ const menuItems = [
     { name: "クライアント", href: "/clients", icon: Briefcase },
     { name: "パートナー", href: "/partners", icon: Handshake },
     { name: "請求管理", href: "/bills", icon: FileText },
-    { name: "料金ルール", href: "/pricing-rules", icon: Settings },
-    { name: "自社情報", href: "/settings/company", icon: Building2 },
+    { name: "料金ルール", href: "/pricing-rules", icon: FileText },
+    { name: "売上分析", href: "/analytics", icon: TrendingUp },
+    { name: "使い方FAQ", href: "/faq", icon: HelpCircle },
+    { name: "設定", href: "/settings", icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ version = "0.1.0" }: { version?: string }) {
     const pathname = usePathname();
 
     return (
@@ -58,7 +62,7 @@ export function Sidebar() {
             </nav>
             <div className="p-4 border-t border-zinc-800">
                 <div className="text-xs text-zinc-500 text-center">
-                    &copy; Honotec Movie
+                    v{version} &copy; Honotec Movie
                 </div>
             </div>
         </aside>

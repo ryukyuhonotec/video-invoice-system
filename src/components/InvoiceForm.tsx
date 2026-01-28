@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+// Remove ActionResponse import if not used, or keep if needed later
+import { TaxRate, InvoiceStatusEnum, TaskStatusEnum } from "@/config/constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,22 +10,42 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { getClients, getPartners, getPricingRules, upsertInvoice, getStaff } from "@/actions/pricing-actions";
 import { calculatePrice } from "@/lib/pricing";
-import { Invoice, InvoiceItem, Client, Partner, PricingRule, Outsource, Staff } from "@/types";
-import { PlusCircle, Trash2, Save, Users, Calendar, CheckCircle2, ShieldCheck, FileText, Search, Package, ClipboardList } from "lucide-react";
+import { Invoice, InvoiceItem, InvoiceStatus, Client, Partner, PricingRule, Outsource, Staff } from "@/types";
+import { PlusCircle, Save, Calendar, ShieldCheck, FileText, Search, ClipboardList, AlertTriangle, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { InvoiceItemRow } from "./invoice-form/InvoiceItemRow";
+import { DeliveryInfoSection } from "./invoice-form/DeliveryInfoSection";
+
+export interface MasterData {
+    clients: Client[];
+    partners: Partner[];
+    pricingRules: PricingRule[];
+    staffList: Staff[];
+}
 
 interface InvoiceFormProps {
     initialData?: Invoice;
     isEditing?: boolean;
+    masterData?: MasterData;
 }
 
-export default function InvoiceForm({ initialData, isEditing = false }: InvoiceFormProps) {
+export default function InvoiceForm({ initialData, isEditing = false, masterData }: InvoiceFormProps) {
     const router = useRouter();
-    const [clients, setClients] = useState<Client[]>([]);
-    const [partners, setPartners] = useState<Partner[]>([]);
-    const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
-    const [staffList, setStaffList] = useState<Staff[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [clients, setClients] = useState<Client[]>(masterData?.clients || []);
+    const [partners, setPartners] = useState<Partner[]>(masterData?.partners || []);
+    const [pricingRules, setPricingRules] = useState<PricingRule[]>(masterData?.pricingRules || []);
+    const [staffList, setStaffList] = useState<Staff[]>(masterData?.staffList || []);
+    const [isLoading, setIsLoading] = useState(!masterData);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -39,7 +61,15 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
     const [actualDeliveryDate, setActualDeliveryDate] = useState(initialData?.actualDeliveryDate ? new Date(initialData.actualDeliveryDate).toISOString().split('T')[0] : "");
     const [requestUrl, setRequestUrl] = useState(initialData?.requestUrl || "");
     const [deliveryUrl, setDeliveryUrl] = useState(initialData?.deliveryUrl || "");
-    const [invoiceStatus, setInvoiceStatus] = useState(initialData?.status || '受注前');
+    const [deliveryNote, setDeliveryNote] = useState(initialData?.deliveryUrl ? (initialData as any).deliveryNote || "" : ""); // Type assertion kept only if field missing in Invoice type but present in DB/API response, but assuming types updated or field exists. Keeping defensive for now.
+    const [invoiceStatus, setInvoiceStatus] = useState<InvoiceStatus>(initialData?.status || InvoiceStatusEnum.DRAFT);
+
+    // Warning Modal State
+    const [showWarning, setShowWarning] = useState(false);
+    const [pendingSaveAction, setPendingSaveAction] = useState<{ isDelivered: boolean } | null>(null);
+    const [priceDiscrepancies, setPriceDiscrepancies] = useState<string[]>([]);
+
+    const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
 
     // Items state - each item has multiple tasks (outsources)
     const [items, setItems] = useState<Partial<InvoiceItem>[]>(
@@ -47,19 +77,49 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
             id: Math.random().toString(),
             name: "",
             quantity: 1,
-            duration: "",
-            productionStatus: '受注前',
+            // duration: "", // Removed from Item
+            productionStatus: TaskStatusEnum.PRE_ORDER as any, // Cast to any if ProductionStatus type mismatch with TaskStatusEnum
+            unitPrice: 0,
+            amount: 0,
             outsources: [{
                 id: `task-${Date.now()}`,
-                pricingRuleId: "",
-                partnerId: "",
+                invoiceItemId: "",
+                pricingRuleId: undefined,
+                partnerId: undefined,
                 revenueAmount: 0,
                 costAmount: 0,
-                deliveryDate: "",
-                status: "受注前"
-            } as any]
+                status: TaskStatusEnum.PRE_ORDER,
+                deliveryDate: undefined,
+                duration: "",
+                deliveryUrl: "",
+                deliveryNote: ""
+            } as Outsource]
         }]
     );
+
+    // Handler functions
+    const handleAddItem = useCallback(() => {
+        setItems(prev => [...prev, {
+            id: Math.random().toString(),
+            name: "",
+            quantity: 1,
+            productionStatus: TaskStatusEnum.PRE_ORDER as any,
+            unitPrice: 0,
+            amount: 0,
+            outsources: [{
+                id: `task-${Date.now()}`,
+                invoiceItemId: "",
+                pricingRuleId: undefined,
+                partnerId: undefined,
+                revenueAmount: 0,
+                costAmount: 0,
+                deliveryDate: undefined,
+                status: TaskStatusEnum.PRE_ORDER,
+                deliveryUrl: "",
+                deliveryNote: ""
+            } as Outsource]
+        }]);
+    }, []);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -73,17 +133,22 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
     }, []);
 
     useEffect(() => {
+        if (masterData) {
+            setIsLoading(false);
+            return;
+        }
         const loadData = async () => {
+            // Type assertion for component usage if necessary, but ideally fetch returns correct types
             const [cData, pData, rData, sData] = await Promise.all([
                 getClients(),
                 getPartners(),
                 getPricingRules(),
                 getStaff()
             ]);
-            setClients(cData as any);
-            setPartners(pData as any);
-            setPricingRules(rData as any);
-            setStaffList(sData as any);
+            setClients(cData as Client[]);
+            setPartners(pData as Partner[]);
+            setPricingRules(rData as PricingRule[]);
+            setStaffList(sData as Staff[]);
             setIsLoading(false);
         };
         loadData();
@@ -97,7 +162,7 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
         }
         if (clientSearchQuery) {
             const query = clientSearchQuery.toLowerCase();
-            result = result.filter(c => c.name.toLowerCase().includes(query) || c.code?.toLowerCase().includes(query));
+            result = result.filter(c => c.name.toLowerCase().includes(query) || (c.code && c.code.toLowerCase().includes(query)));
         }
         return result;
     }, [clients, clientSearchQuery, selectedStaffFilter]);
@@ -119,136 +184,224 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
         let revenue = 0;
         let cost = 0;
         items.forEach(item => {
-            (item.outsources || []).forEach((task: any) => {
+            (item.outsources || []).forEach((task) => {
                 revenue += Number(task.revenueAmount) || 0;
                 cost += Number(task.costAmount) || 0;
             });
         });
-        const taxAmount = Math.floor(revenue * 0.1);
+        const taxAmount = Math.floor(revenue * TaxRate);
         const total = revenue + taxAmount;
         const profit = total - cost;
         const margin = total > 0 ? (profit / total) * 100 : 0;
         return { totalRevenue: total, totalCost: cost, subtotal: revenue, tax: taxAmount, estimatedProfit: profit, profitMargin: margin };
     }, [items]);
 
-    // Handler functions
-    const handleAddItem = () => {
-        setItems([...items, {
-            id: Math.random().toString(),
-            name: "",
-            quantity: 1,
-            productionStatus: '受注前',
-            outsources: [{
-                id: `task-${Date.now()}`,
-                pricingRuleId: "",
-                partnerId: "",
-                revenueAmount: 0,
-                costAmount: 0,
-                deliveryDate: "",
-                status: "受注前"
-            } as any]
-        }]);
-    };
 
-    const handleRemoveItem = (index: number) => {
+    const handleRemoveItem = useCallback((index: number) => {
         if (items.length === 1) return;
-        const newItems = [...items];
-        newItems.splice(index, 1);
-        setItems(newItems);
-    };
-
-    const handleAddTask = (itemIndex: number) => {
-        const newItems = [...items];
-        const item = { ...newItems[itemIndex] };
-        item.outsources = [...(item.outsources || []), {
-            id: `task-${Date.now()}`,
-            pricingRuleId: "",
-            partnerId: "",
-            revenueAmount: 0,
-            costAmount: 0,
-            deliveryDate: "",
-            status: "受注前"
-        } as any];
-        newItems[itemIndex] = item;
-        setItems(newItems);
-    };
-
-    const handleRemoveTask = (itemIndex: number, taskIndex: number) => {
-        const newItems = [...items];
-        const item = { ...newItems[itemIndex] };
-        const tasks = [...(item.outsources || [])];
-        if (tasks.length === 1) return;
-        tasks.splice(taskIndex, 1);
-        item.outsources = tasks;
-        newItems[itemIndex] = item;
-        setItems(newItems);
-    };
-
-    const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
-        const newItems = [...items];
-        newItems[index] = { ...newItems[index], [field]: value };
-        setItems(newItems);
-    };
-
-    const updateTask = (itemIndex: number, taskIndex: number, field: string, value: any) => {
-        const newItems = [...items];
-        const item = { ...newItems[itemIndex] };
-        const tasks = [...(item.outsources || [])];
-        const task = { ...tasks[taskIndex], [field]: value };
-
-        // Auto-calculate price when rule or duration changes
-        if (field === 'pricingRuleId') {
-            const rule = pricingRules.find(r => r.id === value);
-            // Use task duration if available, or default
-            const duration = task.duration || "0:00";
-            if (rule) {
-                task.revenueAmount = calculatePrice(rule, duration, 'revenue');
-                task.costAmount = calculatePrice(rule, duration, 'cost');
-            }
+        const item = items[index];
+        if (item.name && item.name.length > 0) {
+            if (!window.confirm("この品目を削除してもよろしいですか？")) return;
         }
 
-        // Recalculate when duration changes
-        if (field === 'duration') {
-            const duration = value;
-            if (task.pricingRuleId) {
-                const rule = pricingRules.find(r => r.id === task.pricingRuleId);
+        setItems(prev => {
+            const newItems = [...prev];
+            newItems.splice(index, 1);
+            return newItems;
+        });
+    }, [items]);
+
+    const handleAddTask = useCallback((itemIndex: number) => {
+        setItems(prev => {
+            const newItems = [...prev];
+            const item = { ...newItems[itemIndex] };
+            item.outsources = [...(item.outsources || []), {
+                id: `task-${Date.now()}`,
+                invoiceItemId: item.id || "",
+                pricingRuleId: undefined,
+                partnerId: undefined,
+                revenueAmount: 0,
+                costAmount: 0,
+                deliveryDate: undefined,
+                status: TaskStatusEnum.PRE_ORDER,
+                deliveryUrl: "",
+                deliveryNote: ""
+            } as Outsource];
+            newItems[itemIndex] = item;
+            return newItems;
+        });
+    }, []);
+
+    const handleRemoveTask = useCallback((itemIndex: number, taskIndex: number) => {
+        const item = items[itemIndex];
+        const tasks = item.outsources || [];
+        if (tasks.length === 1) return;
+
+        const task = tasks[taskIndex];
+        // Confirm if task has entered data (price, partner, etc)
+        if ((task.pricingRuleId || task.partnerId || task.revenueAmount > 0) && !window.confirm("このタスクを削除してもよろしいですか？")) {
+            return;
+        }
+
+        setItems(prev => {
+            const newItems = [...prev];
+            const currentItem = { ...newItems[itemIndex] };
+            const currentTasks = [...(currentItem.outsources || [])];
+            currentTasks.splice(taskIndex, 1);
+            currentItem.outsources = currentTasks;
+            newItems[itemIndex] = currentItem;
+            return newItems;
+        });
+    }, [items]);
+
+    const updateItem = useCallback((index: number, field: keyof InvoiceItem, value: any) => {
+        setItems(prev => {
+            const newItems = [...prev];
+            newItems[index] = { ...newItems[index], [field]: value };
+            return newItems;
+        });
+    }, []);
+
+    // Refactored to have stricter types for value, but kept as any for simplicity in generic handler
+    const updateTask = useCallback((itemIndex: number, taskIndex: number, field: keyof Outsource, value: any) => {
+        setItems(prev => {
+            const newItems = [...prev];
+            const item = { ...newItems[itemIndex] };
+            const tasks = [...(item.outsources || [])];
+            const task = { ...tasks[taskIndex], [field]: value };
+
+            // Auto-calculate price when rule changes
+            if (field === 'pricingRuleId') {
+                const rule = pricingRules.find(r => r.id === value);
+                // Use task duration if available, or default
+                const duration = task.duration || "0:00";
                 if (rule) {
                     task.revenueAmount = calculatePrice(rule, duration, 'revenue');
                     task.costAmount = calculatePrice(rule, duration, 'cost');
                 }
             }
-        }
 
-        tasks[taskIndex] = task;
-        item.outsources = tasks;
-        newItems[itemIndex] = item;
-        setItems(newItems);
+            // Recalculate when duration changes
+            if (field === 'duration') {
+                const duration = value;
+                if (task.pricingRuleId) {
+                    const rule = pricingRules.find(r => r.id === task.pricingRuleId);
+                    if (rule) {
+                        task.revenueAmount = calculatePrice(rule, duration, 'revenue');
+                        task.costAmount = calculatePrice(rule, duration, 'cost');
+                    }
+                }
+            }
 
-        // Recalculate item totals
-        const itemRevenue = tasks.reduce((sum, t: any) => sum + (Number(t.revenueAmount) || 0), 0);
-        newItems[itemIndex] = { ...newItems[itemIndex], amount: itemRevenue, unitPrice: itemRevenue };
-        setItems(newItems);
+            tasks[taskIndex] = task;
+            item.outsources = tasks;
+            newItems[itemIndex] = item;
+
+            // Recalculate item totals
+            const itemRevenue = tasks.reduce((sum, t) => sum + (Number(t.revenueAmount) || 0), 0);
+            newItems[itemIndex] = { ...newItems[itemIndex], amount: itemRevenue, unitPrice: itemRevenue };
+
+            return newItems;
+        });
+    }, [pricingRules]);
+
+
+
+    const calculateStandardPrice = (task: Outsource) => {
+        if (!task.pricingRuleId || !task.duration) return { revenue: 0, cost: 0 };
+        const rule = pricingRules.find(r => r.id === task.pricingRuleId);
+        if (!rule) return { revenue: 0, cost: 0 };
+        return {
+            revenue: calculatePrice(rule, task.duration, 'revenue'),
+            cost: calculatePrice(rule, task.duration, 'cost')
+        };
     };
 
+    const validateForm = () => {
+        const errors: { [key: string]: string } = {};
 
-
-    const handleSave = async (setDeliveredStatus = false) => {
         if (!selectedClientId) {
-            alert("クライアントを選択してください");
+            errors['clientId'] = "クライアントを選択してください";
+        }
+
+        items.forEach((item, i) => {
+            if (!item.name || !item.name.trim()) {
+                errors[`items.${i}.name`] = "品目名を入力してください";
+            }
+            (item.outsources || []).forEach((task, j) => {
+                if (!task.pricingRuleId) {
+                    errors[`items.${i}.outsources.${j}.pricingRuleId`] = "料金ルールを選択してください";
+                }
+            });
+        });
+
+        setValidationErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    const handleInitialSave = async (setDeliveredStatus = false) => {
+        // Validation & Discrepancy Check
+        if (!validateForm()) {
+            const errorCount = Object.keys(validationErrors).length || 1; // At least 1 if we're here
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
+
+        const discrepancies: string[] = [];
+        items.forEach((item, i) => {
+            (item.outsources || []).forEach((task: Outsource, j) => {
+                const standard = calculateStandardPrice(task);
+                // Check if manually modified (allow 1 yen diff for rounding)
+                if (Math.abs(Number(task.revenueAmount) - standard.revenue) > 1) {
+                    discrepancies.push(`品目${i + 1}-タスク${j + 1}: 請求額 (設定: ¥${standard.revenue.toLocaleString()} → 入力: ¥${Number(task.revenueAmount).toLocaleString()})`);
+                }
+                if (Math.abs(Number(task.costAmount) - standard.cost) > 1) {
+                    discrepancies.push(`品目${i + 1}-タスク${j + 1}: 原価 (設定: ¥${standard.cost.toLocaleString()} → 入力: ¥${Number(task.costAmount).toLocaleString()})`);
+                }
+            });
+        });
+
+        if (discrepancies.length > 0) {
+            setPriceDiscrepancies(discrepancies);
+            setPendingSaveAction({ isDelivered: setDeliveredStatus });
+            setShowWarning(true);
+        } else {
+            await executeSave(setDeliveredStatus);
+        }
+    };
+
+    const handleTerminateSave = async () => {
+        if (!confirm("案件を途中完了にしますか？\n(未完了のタスクがあってもステータスを完了に変更します)")) {
+            return;
+        }
+        await executeSave(false, InvoiceStatusEnum.COMPLETED);
+    };
+
+    const handleCreateQuotation = async () => {
+        // If already saved (has ID) and no changes, just go.
+        // But simpler to just save first to ensure latest data.
+        // Force status '受注前' if currently '受注前' to avoid accidental status change?
+        // User said "create when registering status pre-order".
+        // So we proceed with current status or default.
+        const savedInvoice = await executeSave(false, undefined, true); // true = no redirect
+        if (savedInvoice && savedInvoice.id) {
+            window.open(`/invoices/${savedInvoice.id}/publish?type=quotation`, '_blank');
+        }
+    };
+
+    const executeSave = async (setDeliveredStatus: boolean, statusOverride?: string, noRedirect: boolean = false) => {
         setIsSaving(true);
         setSaveError(null);
         try {
             const itemsToSave = setDeliveredStatus
                 ? items.map(item => ({
                     ...item,
-                    productionStatus: '納品済',
-                    outsources: (item.outsources || []).map((t: any) => ({ ...t, status: '納品済' }))
+                    productionStatus: TaskStatusEnum.DELIVERED as any,
+                    outsources: (item.outsources || []).map((t) => ({ ...t, status: TaskStatusEnum.DELIVERED }))
                 }))
                 : items;
 
-            await upsertInvoice({
+            const res = await upsertInvoice({
                 id: initialData?.id,
                 clientId: selectedClientId,
                 staffId: selectedStaffId || null,
@@ -256,8 +409,9 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
                 actualDeliveryDate: actualDeliveryDate || null,
                 requestUrl,
                 deliveryUrl,
-                status: invoiceStatus,
-                items: itemsToSave,
+                deliveryNote,
+                status: (statusOverride || invoiceStatus) as InvoiceStatus,
+                items: itemsToSave as InvoiceItem[],
                 subtotal,
                 tax,
                 totalAmount: totalRevenue,
@@ -265,11 +419,28 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
                 profit: estimatedProfit,
                 profitMargin
             });
-            alert(setDeliveredStatus ? "納品完了しました" : (isEditing ? "案件情報を更新しました" : "新しい案件を作成しました"));
-            router.push("/");
+
+            if (!res.success) {
+                throw new Error(res.error);
+            }
+
+            const saved = res.data;
+            setShowWarning(false);
+
+            if (!noRedirect) {
+                if (statusOverride === InvoiceStatusEnum.COMPLETED) {
+                    alert("案件を途中終了（完了）しました");
+                } else {
+                    alert(setDeliveredStatus ? "納品完了しました" : (isEditing ? "案件情報を更新しました" : "新しい案件を作成しました"));
+                }
+                router.push("/");
+            }
+            return saved;
         } catch (e: any) {
             console.error("Save error:", e);
             setSaveError(e.message || "保存中にエラーが発生しました。");
+            setShowWarning(false);
+            return null;
         } finally {
             setIsSaving(false);
         }
@@ -278,8 +449,8 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
     // Check if can complete delivery
     const canCompleteDelivery = useMemo(() => {
         const allTasksCompleted = items.every(item =>
-            (item.outsources || []).every((task: any) =>
-                ['納品済', '請求済', '入金済み', '完了'].includes(task.status)
+            (item.outsources || []).every((task: Outsource) =>
+                [TaskStatusEnum.DELIVERED, TaskStatusEnum.BILLED, TaskStatusEnum.PAID, TaskStatusEnum.COMPLETED].includes(task.status as any)
             )
         );
         return allTasksCompleted && !!deliveryUrl;
@@ -294,6 +465,40 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
                     <strong>エラー:</strong> {saveError}
                 </div>
             )}
+
+            <AlertDialog open={showWarning} onOpenChange={setShowWarning}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+                            <AlertTriangle className="h-5 w-5" />
+                            金額の不一致（要確認）
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <div className="space-y-2 mt-2">
+                                <p>設定された料金ルールと入力された金額が異なります。</p>
+                                <ul className="list-disc list-inside text-xs p-2 bg-zinc-100 dark:bg-zinc-800 rounded max-h-40 overflow-y-auto">
+                                    {priceDiscrepancies.map((msg, i) => (
+                                        <li key={i}>{msg}</li>
+                                    ))}
+                                </ul>
+                                <p className="font-bold mt-2">このまま保存しますか？</p>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => {
+                            if (pendingSaveAction) {
+                                executeSave(pendingSaveAction.isDelivered);
+                            } else {
+                                executeSave(false);
+                            }
+                        }} className="bg-amber-600 hover:bg-amber-700">
+                            保存する
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* ===== STEP 1: 案件登録 ===== */}
             <Card className="border-l-4 border-l-blue-500 shadow-lg overflow-hidden">
@@ -316,7 +521,7 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
                         </div>
                         <div className="md:col-span-5 space-y-1 relative">
                             <Label className="text-xs text-zinc-500 dark:text-zinc-400">クライアント検索</Label>
-                            <div className="relative">
+                            <div className={`relative ${validationErrors['clientId'] ? 'ring-2 ring-red-500 rounded-md' : ''}`}>
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
                                 <Input
                                     value={clientSearchQuery}
@@ -368,11 +573,18 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
                         </div>
                         <div className="md:col-span-2 space-y-1">
                             <Label className="text-xs text-zinc-500 dark:text-zinc-400">案件ステータス</Label>
-                            <Select value={invoiceStatus} onChange={(e) => setInvoiceStatus(e.target.value)} className="h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
-                                <option value="受注前">受注前</option>
-                                <option value="進行中">進行中</option>
-                                <option value="納品済">納品済</option>
-                                <option value="失注">失注</option>
+                            <Select value={invoiceStatus} onChange={(e) => setInvoiceStatus(e.target.value as InvoiceStatus)} className="h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
+                                <option value={InvoiceStatusEnum.DRAFT}>{InvoiceStatusEnum.DRAFT}</option>
+                                <option value={InvoiceStatusEnum.IN_PROGRESS}>{InvoiceStatusEnum.IN_PROGRESS}</option>
+                                {((isEditing && initialData?.status !== InvoiceStatusEnum.DRAFT) || ([InvoiceStatusEnum.DELIVERED, InvoiceStatusEnum.BILLED, InvoiceStatusEnum.SENT, InvoiceStatusEnum.COMPLETED, InvoiceStatusEnum.LOST] as string[]).includes(invoiceStatus)) && (
+                                    <>
+                                        <option value={InvoiceStatusEnum.DELIVERED}>{InvoiceStatusEnum.DELIVERED}</option>
+                                        <option value={InvoiceStatusEnum.BILLED}>{InvoiceStatusEnum.BILLED}</option>
+                                        <option value={InvoiceStatusEnum.SENT}>{InvoiceStatusEnum.SENT}</option>
+                                        <option value={InvoiceStatusEnum.COMPLETED}>{InvoiceStatusEnum.COMPLETED} (途中終了)</option>
+                                        <option value={InvoiceStatusEnum.LOST}>{InvoiceStatusEnum.LOST}</option>
+                                    </>
+                                )}
                             </Select>
                         </div>
                         <div className="md:col-span-8 space-y-1">
@@ -383,8 +595,10 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
                 </CardContent>
             </Card>
 
+
+
             {/* ===== 品目・タスク設定 - Only show when not 受注前 or 失注 ===== */}
-            {invoiceStatus !== '失注' && (
+            {invoiceStatus !== InvoiceStatusEnum.LOST && (
                 <div className="space-y-4">
                     <div className="flex justify-between items-center px-1">
                         <h2 className="text-lg font-bold tracking-tight">📦 品目・タスク設定</h2>
@@ -394,206 +608,75 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
                     </div>
 
                     {items.map((item, itemIndex) => (
-                        <Card key={item.id} className="overflow-hidden shadow-md border-zinc-200">
-                            {/* Item Header */}
-                            <div className="p-4 bg-zinc-800 text-white grid grid-cols-12 gap-3 items-end">
-                                <div className="col-span-12 md:col-span-8 space-y-1">
-                                    <Label className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">品目名</Label>
-                                    <Input
-                                        value={item.name || ""}
-                                        onChange={(e) => updateItem(itemIndex, 'name', e.target.value)}
-                                        className="bg-zinc-700/50 border-zinc-600 text-white placeholder:text-zinc-500 h-9"
-                                        placeholder="〇〇様 PR動画"
-                                    />
-                                </div>
-                                <div className="col-span-4 md:col-span-3 space-y-1 text-right">
-                                    <Label className="text-[10px] text-green-400 uppercase font-bold tracking-wider">合計請求</Label>
-                                    <div className="flex h-9 w-full rounded-md border border-zinc-600 bg-zinc-900 px-3 items-center justify-end font-mono text-green-400 font-bold text-sm">
-                                        ¥{item.amount?.toLocaleString() || 0}
-                                    </div>
-                                </div>
-                                <div className="col-span-2 md:col-span-1 flex justify-end">
-                                    <Button size="icon" variant="ghost" className="text-zinc-500 hover:text-red-400 h-9 w-9" onClick={() => handleRemoveItem(itemIndex)} disabled={items.length === 1}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Tasks (Outsources) */}
-                            <CardContent className="bg-white p-4 space-y-3">
-                                <div className="flex items-center justify-between border-b pb-2">
-                                    <Label className="text-xs font-bold text-zinc-700 flex items-center gap-2">
-                                        <Users className="w-4 h-4 text-blue-500" /> タスク（担当領域）
-                                    </Label>
-                                    <Button size="sm" variant="outline" className="text-[10px] h-7 px-3 border-blue-200 text-blue-600 hover:bg-blue-50" onClick={() => handleAddTask(itemIndex)}>
-                                        <PlusCircle className="w-3 h-3 mr-1" /> タスク追加
-                                    </Button>
-                                </div>
-
-                                {(item.outsources || []).map((task: any, taskIndex: number) => {
-                                    const selectedRule = pricingRules.find(r => r.id === task.pricingRuleId);
-                                    const rulePartners = selectedRule?.partners || [];
-
-                                    return (
-                                        <div key={task.id} className="bg-zinc-50 p-3 border rounded-lg space-y-3">
-
-                                            {/* Row 1: Rule, Partner, Status */}
-                                            <div className="grid grid-cols-12 gap-3 items-end">
-                                                {/* Pricing Rule */}
-                                                <div className="col-span-12 md:col-span-4 space-y-1">
-                                                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">料金ルール（担当領域）</Label>
-                                                    <Select className="text-xs h-9 bg-white" value={task.pricingRuleId || ""} onChange={(e) => updateTask(itemIndex, taskIndex, 'pricingRuleId', e.target.value)}>
-                                                        <option value="">選択...</option>
-                                                        {availableRules.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                                                    </Select>
-                                                </div>
-
-                                                {/* Partner */}
-                                                <div className="col-span-12 md:col-span-4 space-y-1">
-                                                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">パートナー</Label>
-                                                    <Select className="text-xs h-9 bg-white" value={task.partnerId || ""} onChange={(e) => updateTask(itemIndex, taskIndex, 'partnerId', e.target.value)} disabled={!task.pricingRuleId}>
-                                                        <option value="">選択...</option>
-                                                        {(rulePartners.length > 0 ? rulePartners : partners).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                                    </Select>
-                                                </div>
-
-                                                {/* Status - Restrict options for tasks (no Billed/Paid) */}
-                                                <div className="col-span-12 md:col-span-3 space-y-1">
-                                                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">ステータス</Label>
-                                                    <Select className="text-xs h-9 bg-white" value={task.status || "受注前"} onChange={(e) => updateTask(itemIndex, taskIndex, 'status', e.target.value)}>
-                                                        <option value="受注前">受注前</option>
-                                                        <option value="制作中">制作中</option>
-                                                        <option value="確認中">確認中</option>
-                                                        <option value="納品済">納品済</option>
-                                                    </Select>
-                                                </div>
-
-                                                {/* Delete Button placeholder */}
-                                                <div className="col-span-12 md:col-span-1 flex justify-end">
-                                                    {/* Button code is outside this block in original, but layout needs it here? No, let's keep it clean. */}
-                                                </div>
-                                            </div>
-
-                                            {/* Row 2: Date, Duration, Revenue, Cost */}
-                                            <div className="grid grid-cols-12 gap-3 items-end border-t border-zinc-200 pt-3">
-                                                {/* Delivery Date */}
-                                                <div className="col-span-6 md:col-span-3 space-y-1">
-                                                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">納期</Label>
-                                                    <Input
-                                                        type="date"
-                                                        className="text-xs h-9 bg-white"
-                                                        value={task.deliveryDate instanceof Date ? task.deliveryDate.toISOString().split('T')[0] : (task.deliveryDate ? String(task.deliveryDate).split('T')[0] : "")}
-                                                        onChange={(e) => updateTask(itemIndex, taskIndex, 'deliveryDate', e.target.value)}
-                                                    />
-                                                </div>
-
-                                                {/* Duration (尺) */}
-                                                <div className="col-span-6 md:col-span-3 space-y-1">
-                                                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">尺 (MM:SS)</Label>
-                                                    <Input
-                                                        className="text-xs h-9 bg-white"
-                                                        placeholder="05:00"
-                                                        value={task.duration || ""}
-                                                        onChange={(e) => updateTask(itemIndex, taskIndex, 'duration', e.target.value)}
-                                                    />
-                                                </div>
-
-                                                {/* Revenue */}
-                                                <div className="col-span-6 md:col-span-2 space-y-1">
-                                                    <Label className="text-[9px] font-bold text-green-600 uppercase">請求額</Label>
-                                                    <Input className="text-xs h-9 text-right font-mono bg-white border-green-200" type="number" value={task.revenueAmount || ""} onChange={(e) => updateTask(itemIndex, taskIndex, 'revenueAmount', e.target.value)} />
-                                                </div>
-
-                                                {/* Cost */}
-                                                <div className="col-span-6 md:col-span-2 space-y-1">
-                                                    <Label className="text-[9px] font-bold text-red-500 uppercase">原価</Label>
-                                                    <Input className="text-xs h-9 text-right font-mono bg-white border-red-100" type="number" value={task.costAmount || ""} onChange={(e) => updateTask(itemIndex, taskIndex, 'costAmount', e.target.value)} />
-                                                </div>
-                                            </div>
-
-                                            {/* Row 3: Task Delivery URL */}
-                                            <div className="grid grid-cols-12 gap-3 items-end border-t border-zinc-200 pt-3">
-                                                <div className="col-span-12 space-y-1">
-                                                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">タスク納品URL</Label>
-                                                    <Input
-                                                        className="text-xs h-9 bg-white"
-                                                        placeholder="https://drive.google.com/..."
-                                                        value={task.deliveryUrl || ""}
-                                                        onChange={(e) => updateTask(itemIndex, taskIndex, 'deliveryUrl', e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Remove Task */}
-                                            {(item.outsources?.length || 0) > 1 && (
-                                                <div className="col-span-12 md:col-span-0 flex justify-end">
-                                                    <Button size="icon" variant="ghost" className="h-9 w-9 text-zinc-300 hover:text-red-500" onClick={() => handleRemoveTask(itemIndex, taskIndex)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </CardContent>
-                        </Card>
+                        <InvoiceItemRow
+                            key={item.id}
+                            item={item}
+                            itemIndex={itemIndex}
+                            updateItem={updateItem}
+                            handleRemoveItem={handleRemoveItem}
+                            handleAddTask={handleAddTask}
+                            updateTask={updateTask}
+                            handleRemoveTask={handleRemoveTask}
+                            pricingRules={pricingRules}
+                            partners={partners}
+                            availableRules={availableRules}
+                            canDeleteItem={items.length > 1}
+                            errors={validationErrors}
+                        />
                     ))}
                 </div>
             )}
 
-            {/* ===== STEP 2: 納品情報 - Only show when editing ===== */}
-            {isEditing && (
-                <Card className="border-l-4 border-l-amber-500 shadow-lg overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-amber-50 to-amber-100/50 border-b">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Package className="w-5 h-5 text-amber-600" />
-                            <span className="text-amber-800">Step 2: 納品情報</span>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-4 p-6">
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-sm font-bold text-zinc-700 flex items-center gap-1"><Calendar className="w-4 h-4" /> 納品完了日</Label>
-                                <Input type="date" value={actualDeliveryDate} onChange={(e) => setActualDeliveryDate(e.target.value)} className={`h-10 bg-white ${!actualDeliveryDate ? 'border-amber-400' : 'border-green-400'}`} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-sm font-bold text-zinc-700 flex items-center gap-1"><FileText className="w-4 h-4" /> 納品URL</Label>
-                                <Input type="text" placeholder="https://drive.google.com/..." value={deliveryUrl} onChange={(e) => setDeliveryUrl(e.target.value)} className={`h-10 bg-white text-sm ${!deliveryUrl ? 'border-amber-400' : 'border-green-400'}`} />
-                            </div>
-                        </div>
-
-                        <div className="flex justify-center pt-4">
-                            <Button
-                                size="lg"
-                                onClick={() => handleSave(true)}
-                                disabled={!canCompleteDelivery || isSaving}
-                                className={`px-12 h-14 text-lg font-bold shadow-xl ${canCompleteDelivery ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-zinc-300 text-zinc-500 cursor-not-allowed'}`}
-                            >
-                                <CheckCircle2 className="mr-2 h-6 w-6" /> 納品完了
-                            </Button>
-                        </div>
-                        {!canCompleteDelivery && <p className="text-center text-sm text-amber-600">⚠️ 納品完了には、全タスクの納期・納品URLの入力が必要です</p>}
-                    </CardContent>
-                </Card>
+            {/* Top Error Message */}
+            {Object.keys(validationErrors).length > 0 && (
+                <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2 fade-in">
+                    <div className="bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5" />
+                        <span className="font-bold">入力エラーがあります。確認してください。</span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-white hover:bg-white/20 rounded-full"
+                            onClick={() => setValidationErrors({})}
+                        >
+                            ×
+                        </Button>
+                    </div>
+                </div>
             )}
+
+            {/* ===== STEP 2: 納品情報 - Only show when editing ===== */}
+            <DeliveryInfoSection
+                isEditing={isEditing}
+                actualDeliveryDate={actualDeliveryDate}
+                setActualDeliveryDate={setActualDeliveryDate}
+                deliveryUrl={deliveryUrl}
+                setDeliveryUrl={setDeliveryUrl}
+                deliveryNote={deliveryNote}
+                setDeliveryNote={setDeliveryNote}
+                handleInitialSave={handleInitialSave}
+                handleTerminateSave={handleTerminateSave}
+                canCompleteDelivery={canCompleteDelivery}
+                isSaving={isSaving}
+            />
 
             {/* ===== Summary ===== */}
             <Card className="shadow-lg border-zinc-300 overflow-hidden">
                 <CardFooter className="flex flex-wrap justify-end p-6 bg-zinc-900 text-white gap-x-8 gap-y-4">
                     <div className="flex flex-col items-end">
                         <div className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest mb-1">売上</div>
-                        <div className="text-2xl font-mono text-white">¥{totalRevenue.toLocaleString()}</div>
+                        <div className="text-xl sm:text-2xl font-mono text-white">¥{totalRevenue.toLocaleString()}</div>
                         <div className="text-[10px] text-zinc-500">(税込)</div>
                     </div>
                     <div className="flex flex-col items-end">
                         <div className="text-[10px] text-red-400 uppercase font-bold tracking-widest mb-1">原価</div>
-                        <div className="text-2xl font-mono text-red-400">¥{totalCost.toLocaleString()}</div>
+                        <div className="text-xl sm:text-2xl font-mono text-red-400">¥{totalCost.toLocaleString()}</div>
                     </div>
                     <div className="flex flex-col items-end border-l border-zinc-700 pl-8">
                         <div className="text-[10px] text-green-400 uppercase font-bold tracking-widest mb-1">粗利</div>
                         <div className="flex items-baseline gap-2">
                             <span className="text-xs text-zinc-500">{profitMargin.toFixed(0)}%</span>
-                            <div className={`text-2xl font-mono font-bold ${profitMargin > 30 ? 'text-green-500' : 'text-orange-500'}`}>
+                            <div className={`text-xl sm:text-2xl font-mono font-bold ${profitMargin > 30 ? 'text-green-500' : 'text-orange-500'}`}>
                                 ¥{estimatedProfit.toLocaleString()}
                             </div>
                         </div>
@@ -603,10 +686,17 @@ export default function InvoiceForm({ initialData, isEditing = false }: InvoiceF
 
             <div className="flex justify-end gap-4 p-4 mb-20">
                 <Button variant="ghost" size="lg" onClick={() => router.back()}>戻る</Button>
-                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 h-12 font-bold shadow-xl" onClick={() => handleSave(false)} disabled={isSaving}>
+                {/* Send Button Removed as per user request */}
+                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 h-12 font-bold shadow-xl" onClick={() => handleInitialSave(false)} disabled={isSaving}>
                     <Save className="mr-2 h-5 w-5" /> {isSaving ? '保存中...' : '保存'}
                 </Button>
+                {/* Quotation Button - Only if 受注前 (Pre-order) */}
+                {invoiceStatus === InvoiceStatusEnum.DRAFT && (
+                    <Button size="lg" variant="outline" className="border-cyan-500 text-cyan-600 hover:bg-cyan-50 px-6 h-12 font-bold" onClick={handleCreateQuotation} disabled={isSaving}>
+                        <FileText className="mr-2 h-5 w-5" /> 見積書作成
+                    </Button>
+                )}
             </div>
-        </div>
+        </div >
     );
 }

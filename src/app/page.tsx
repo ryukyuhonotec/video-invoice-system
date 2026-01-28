@@ -21,7 +21,7 @@ export default async function Home() {
           <p className="text-zinc-500 dark:text-zinc-400 mt-2 whitespace-nowrap">進行中の案件状況、担当者、納期を一元管理します。</p>
         </div>
         <Link href="/invoices/new">
-          <Button className="bg-blue-600 hover:bg-blue-700 font-bold dark:bg-blue-700 dark:hover:bg-blue-600 shadow-sm">
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">
             + 新規案件作成
           </Button>
         </Link>

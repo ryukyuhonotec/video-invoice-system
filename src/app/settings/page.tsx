@@ -22,7 +22,7 @@ export default function SettingsPage() {
             const [data, logs, user] = await Promise.all([
                 getCompanyProfile(),
                 getAuditLogs({ limit: 50 }),
-                getCurrentUser()
+                getCurrentUser(),
             ]);
             setProfile(data || {});
             setAuditLogs(logs);
@@ -177,7 +177,7 @@ export default function SettingsPage() {
                     </Card>
 
                     <div className="flex justify-end">
-                        <Button size="lg" onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button size="lg" onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">
                             <Save className="mr-2 h-5 w-5" /> 設定を保存
                         </Button>
                     </div>
@@ -245,9 +245,9 @@ export default function SettingsPage() {
                                                 <div className="flex items-center gap-2 text-sm">
                                                     <span className="font-medium">{log.user?.name || '不明'}</span>
                                                     <span className={`px-2 py-0.5 text-xs rounded ${log.action === 'CREATE' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                                            log.action === 'UPDATE' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                                                                log.action === 'DELETE' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                                                    'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
+                                                        log.action === 'UPDATE' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                            log.action === 'DELETE' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                                'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
                                                         }`}>
                                                         {getActionLabel(log.action)}
                                                     </span>

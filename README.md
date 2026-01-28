@@ -1,76 +1,79 @@
-# Video Production Invoice System (制作進行・請求管理システム)
+# Video Invoice System (制作進行・請求管理システム)
 
 動画制作事業に特化した、案件進行管理と請求書作成を統合したシステムです。
 Next.js (App Router) と Prisma (SQLite) を使用して構築されています。
 
+## <span class="emoji">📚</span> ドキュメント (Documentation)
+
+詳細な設計情報は `docs/` ディレクトリにあります。
+
+- **[概念設計 (Conceptual Design)](docs/CONCEPT.md)**
+    - **必読**: 「案件 (Project/Invoice)」と「請求書 (Monthly Bill)」の違い、業務フローについて解説しています。
+- **[データベース設計 (Database Schema)](docs/DB_SCHEMA.md)**
+    - 各モデルの役割とリレーションの定義。
+- **[既知の課題とロードマップ (Issues)](docs/ISSUES.md)**
+    - 現在の制限事項、開発時の注意点、将来の計画。
+
 ## <span class="emoji">🚀</span> 機能概要
 
-### 1. 案件・制作進行管理
+### 1. 案件・制作進行管理 (Project Management)
+- **案件 (Invoice/Job)**: 1つの制作案件単位での管理。
 - **ダッシュボード**: 進行中の案件、納期、担当者を一覧表示。
-- **ステータス管理**: Pre-Order, InProgress, Review, Delivered, Paid などのステータスで進捗を可視化。
-- **発注管理**: 1つの品目に対し、複数のパートナー（エディター、ナレーター、ディレクターなど）をアサインし、個別の発注金額を管理可能。
+- **ステータス管理**: 受注前, 進行中, 納品済, 請求書作成済 などのステータス遷移。
+- **見積・原価管理**: 品目とタスクごとの予算作成と原価管理。
 
-### 2. クライアント・パートナー管理
-- **クライアント管理**: 会社情報、担当者、適用される料金ルールの管理。
-- **パートナー管理**: クリエイター情報の管理、役割（Role）の設定。
+### 2. 請求業務 (Billing)
+- **月次請求**: クライアントごとの「締め請求」に対応。納品済みの案件をまとめて1枚の請求書 (`Bill`) を発行。
+- **入金管理**: 請求書ごとの入金ステータス管理。
 
-### 3. 計算ロジック・料金ルール
-- **料金ルール (Pricing Rules)**: クライアントごとに異なる単価設定や計算ロジック（固定、ステップ、増減）を定義し、適用可能。
-- **自動計算**: ルールに基づいた売上、外注費、粗利のリアルタイム計算。
+### 3. マスター管理
+- **クライアント・パートナー管理**: 取引先情報の管理。
+- **料金ルール (Pricing Rules)**: クライアント/パートナーごとの自動計算ロジック。
 
 ## <span class="emoji">🛠️</span> 技術スタック
 
 - **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
 - **Language**: TypeScript
-- **Database**: PostgreSQL (via Prisma ORM) (Formerly SQLite)
+- **Database**: SQLite (via Prisma ORM)
 - **UI Components**: [shadcn/ui](https://ui.shadcn.com/) + Tailwind CSS
-- **Server Actions**: バックエンドロジックの統合
+- **Auth**: NextAuth.js (v5)
 
 ## <span class="emoji">⚙️</span> 環境構築 (Setup)
 
-### 1. リポジトリのクローン
-```bash
-git clone https://github.com/ryukyuhonotec/video-invoice-system.git
-cd video-invoice-system
-```
-
-### 2. 依存関係のインストール
+### 1. 依存関係のインストール
 ```bash
 npm install
 ```
 
-### 3. 環境変数の設定
-`.env` ファイルを作成し、データベース(Postgres)の接続情報とGoogle認証情報を設定してください。
+### 2. 環境変数の設定
+`.env` ファイルを作成し、必要な変数を設定してください。
 ```bash
 # .env
-# Database (PostgreSQL connection string)
-DATABASE_URL="postgresql://user:password@localhost:5432/video_invoice_db"
-
-# Auth Secrets (Google OAuth)
+DATABASE_URL="file:./dev.db"
 AUTH_SECRET="[random-string]"
-AUTH_GOOGLE_ID="[your-google-client-id]"
-AUTH_GOOGLE_SECRET="[your-google-client-secret]"
+# Google Auth (Optional for Dev, Required for Prod)
+AUTH_GOOGLE_ID="..."
+AUTH_GOOGLE_SECRET="..."
 ```
 
-### 4. データベースのセットアップ
+### 3. データベースのセットアップ
 ```bash
 npx prisma generate
 npx prisma db push
 ```
 
-### 5. 開発サーバーの起動
+> [!IMPORTANT]
+> **開発時の注意**: `schema.prisma` を変更して `prisma generate` を実行した後は、**必ず開発サーバーを再起動** (`Ctrl+C` -> `npm run dev`) してください。
+> 再起動しない場合、Prismaクライアントが更新されずエラーになることがあります。
+
+### 4. 開発サーバーの起動
 ```bash
 npm run dev
 ```
 http://localhost:3000 にアクセスして確認してください。
 
-## <span class="emoji">📂</span> ディレクトリ構成
-- `src/app`: Next.js App Router ページ
-- `src/components`: UIコンポーネント (shadcn/ui 含)
-- `src/actions`: Server Actions (データ操作ロジック)
-- `src/lib`: ユーティリティ、DBクライアント
-- `prisma`: データベーススキーマ、シードデータ
-
 ## <span class="emoji">📝</span> 現在のフェーズ
-**Phase 4: Multi-Relation & Detailed Outsource Management**
-多対多のリレーション構造への移行と、詳細な外注費管理機能の実装・検証段階です。
+**Phase 35 (Completed): Invoice Workflow & Bug Fixes**
+- スタッフ招待機能の修正
+- 請求書作成・送付フローの改善
+- UI/UXの改善（金額表示、バリデーション等）

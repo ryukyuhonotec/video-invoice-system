@@ -144,7 +144,7 @@ function PartnersPageContent() {
                     <h1 className="text-3xl font-bold tracking-tight dark:text-zinc-100">パートナー管理</h1>
                     <p className="text-zinc-500 dark:text-zinc-400">制作スタッフ（カメラマン、エディター等）の管理を行います。</p>
                 </div>
-                <Button onClick={handleAddNew} className="dark:bg-blue-600 dark:hover:bg-blue-700">
+                <Button onClick={handleAddNew} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">
                     <Plus className="w-4 h-4 mr-2" /> パートナー登録
                 </Button>
             </header>
@@ -282,7 +282,7 @@ function PartnersPageContent() {
                         </div>
                         <div className="flex justify-end gap-2">
                             <Button variant="ghost" onClick={() => setIsEditing(false)}>キャンセル</Button>
-                            <Button onClick={handleSave} disabled={isLoading}>
+                            <Button onClick={handleSave} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">
                                 {isLoading ? "保存中..." : "保存"}
                             </Button>
                         </div>
@@ -360,18 +360,20 @@ function PartnersPageContent() {
                                                 onClick={() => router.push(`/partners/${p.id}`)}
                                             >
                                                 <td className="p-4 align-middle">
-                                                    <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2">
-                                                        {p.name}
-                                                        {p.chatworkGroup && (
+                                                    <div className="flex items-center gap-1">
+                                                        {p.chatworkGroup ? (
                                                             <a
                                                                 href={p.chatworkGroup}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 onClick={(e) => e.stopPropagation()}
-                                                                className="text-zinc-400 hover:text-blue-500"
+                                                                className="text-blue-600 font-bold dark:text-blue-400 hover:underline flex items-center gap-1 group"
                                                             >
-                                                                <ExternalLink className="h-4 w-4" />
+                                                                {p.name}
+                                                                <span className="transition-opacity">↗</span>
                                                             </a>
+                                                        ) : (
+                                                            <span className="font-bold text-zinc-900 dark:text-zinc-100">{p.name}</span>
                                                         )}
                                                         {p.isArchived && (
                                                             <span className="text-[10px] bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded text-zinc-600 dark:text-zinc-300">

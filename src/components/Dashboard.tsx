@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { PlusCircle, FileText, Search } from "lucide-react";
 import { Invoice, Client, Partner, Staff } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
-import RevenueChart from "@/components/RevenueChart";
 
 interface DashboardProps {
     initialInvoices: Invoice[];
@@ -63,6 +62,7 @@ export default function Dashboard({
                         staffId: inv.staffId,
                         partnerName: partner?.name || "未定",
                         partnerId: task.partnerId,
+                        partnerChatworkUrl: partner?.chatworkGroup ? `https://chatwork.com/#!rid${partner.chatworkGroup}` : null,
                         operationsLeadName: operationsLead?.name || "-",
                         operationsLeadId: client?.operationsLeadId,
                         accountantName: accountant?.name || "-",
@@ -72,7 +72,8 @@ export default function Dashboard({
                         revenueAmount: task.revenueAmount || 0,
                         costAmount: task.costAmount || 0,
                         duration: item.duration,
-                        issueDate: inv.issueDate
+                        issueDate: inv.issueDate,
+                        requestUrl: inv.requestUrl // Add requestUrl
                     });
                 });
 
@@ -99,7 +100,8 @@ export default function Dashboard({
                         revenueAmount: item.amount || 0,
                         costAmount: 0,
                         duration: item.duration,
-                        issueDate: inv.issueDate
+                        issueDate: inv.issueDate,
+                        requestUrl: inv.requestUrl // Add requestUrl
                     });
                 }
             });
@@ -176,8 +178,8 @@ export default function Dashboard({
 
     return (
         <>
-            {/* Summary Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {/* Summary Stats - Only 制作中 and 確認中 */}
+            <div className="grid grid-cols-2 gap-4 mb-6 max-w-md">
                 <Card>
                     <CardContent className="pt-4 text-center">
                         <div className="text-3xl font-black text-blue-600 dark:text-blue-400">{allTasks.filter(t => t.status === "制作中").length}</div>
@@ -190,28 +192,6 @@ export default function Dashboard({
                         <div className="text-xs text-zinc-500 dark:text-zinc-400">確認中</div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="pt-4 text-center">
-                        <div className="text-3xl font-black text-purple-600 dark:text-purple-400">{allTasks.filter(t => t.status === "納品済").length}</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">納品済</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-4 text-center">
-                        <div className="text-3xl font-black text-green-600 dark:text-green-400">{allTasks.filter(t => t.status === "請求済" || t.status === "入金済み").length}</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">請求済/入金済</div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Revenue Pie Chart */}
-            <div className="mb-6">
-                <RevenueChart
-                    invoices={initialInvoices}
-                    clients={initialClients}
-                    title="クライアント別売上構成（上位5社）"
-                    showTopN={5}
-                />
             </div>
 
             {/* Filters */}
@@ -300,9 +280,22 @@ export default function Dashboard({
                                                 {formatDate(task.deliveryDate)}
                                             </td>
                                             <td className="p-4 align-middle">
-                                                <span className="text-blue-600 font-bold dark:text-blue-400">
-                                                    {task.itemName}
-                                                </span>
+                                                {task.requestUrl ? (
+                                                    <a
+                                                        href={task.requestUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 font-bold dark:text-blue-400 hover:underline flex items-center gap-1 group"
+                                                        onClick={(e) => e.stopPropagation()} // Prevent row click
+                                                    >
+                                                        {task.itemName}
+                                                        <span className="transition-opacity">↗</span>
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-zinc-700 font-bold dark:text-zinc-300">
+                                                        {task.itemName}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="p-4 align-middle text-zinc-700 font-medium dark:text-zinc-300">{task.clientName}</td>
                                             <td className="p-4 align-middle">
@@ -316,7 +309,22 @@ export default function Dashboard({
                                             <td className="px-3 py-4 align-middle">
                                                 <span className="text-xs dark:text-zinc-300">{task.accountantName}</span>
                                             </td>
-                                            <td className="p-4 align-middle text-xs text-zinc-600 dark:text-zinc-400">{task.partnerName}</td>
+                                            <td className="p-4 align-middle text-xs text-zinc-600 dark:text-zinc-400">
+                                                {task.partnerChatworkUrl ? (
+                                                    <a
+                                                        href={task.partnerChatworkUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 font-bold dark:text-blue-400 hover:underline flex items-center gap-1 group"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {task.partnerName}
+                                                        <span className="transition-opacity">↗</span>
+                                                    </a>
+                                                ) : (
+                                                    task.partnerName
+                                                )}
+                                            </td>
                                             <td className="p-4 align-middle">
                                                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
                                                     {task.taskName}

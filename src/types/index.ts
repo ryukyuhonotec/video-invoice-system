@@ -102,6 +102,7 @@ export interface Outsource {
 
     description?: string;
     deliveryUrl?: string;
+    deliveryNote?: string;
 }
 
 export interface Staff {
@@ -111,7 +112,7 @@ export interface Staff {
     role: 'OPERATIONS' | 'ACCOUNTING';
 }
 
-export type InvoiceStatus = 'DRAFT' | 'Unbilled' | 'Billed' | 'Paid' | '請求済' | '入金済み';
+export type InvoiceStatus = 'DRAFT' | 'Unbilled' | 'Billed' | 'Paid' | '請求済' | '入金済み' | '受注前' | '進行中' | '制作中' | '確認中' | '納品済' | '請求書作成済' | '送付済' | '完了' | '失注';
 export type ProductionStatus = '受注前' | '制作中' | '確認中' | '納品済' | '請求済' | '入金済み' | 'Pre-Order' | 'In Progress' | 'Review' | 'Delivered';
 
 export interface InvoiceItem {
@@ -156,3 +157,12 @@ export interface Invoice {
     profit: number;
     profitMargin: number;
 }
+
+export type ActionResponse<T = any> = {
+    success: true;
+    data: T;
+} | {
+    success: false;
+    error: string;
+    details?: any; // Validation errors etc
+};

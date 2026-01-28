@@ -13,27 +13,46 @@ export async function createStaffInvitation(data: {
     staffRole: "OPERATIONS" | "ACCOUNTING";
     expiresInDays?: number;
 }) {
-    const session = await auth();
-    if (!session?.user?.id) {
-        throw new Error("Not authenticated");
-    }
+    try {
+        const session = await auth();
+        // console.log("createStaffInvitation session:", session?.user?.id);
 
-    // Set expiration (default 7 days)
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + (data.expiresInDays || 7));
+        let userId = session?.user?.id;
 
-    const invitation = await (prisma as any).staffInvitation.create({
-        data: {
-            email: data.email || null,
-            name: data.name || null,
-            staffRole: data.staffRole,
-            expiresAt,
-            createdBy: session.user.id
+        // Development fallback
+        if (!userId && process.env.NODE_ENV !== 'production') {
+            const devUser = await prisma.user.findFirst();
+            userId = devUser?.id;
+            // console.log("Using dev user fallback:", userId);
         }
-    });
 
-    revalidatePath('/staff');
-    return invitation;
+        if (!userId) {
+            throw new Error("Not authenticated");
+        }
+
+        // Set expiration (default 7 days)
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + (data.expiresInDays || 7));
+
+        // console.log("Creating invitation with data:", { ...data, createdBy: session.user.id });
+
+        const invitation = await (prisma as any).staffInvitation.create({
+            data: {
+                email: data.email || null,
+                name: data.name || null,
+                staffRole: data.staffRole,
+                expiresAt,
+                createdBy: userId
+            }
+        });
+
+        // console.log("Invitation created:", invitation.id);
+        revalidatePath('/staff');
+        return invitation;
+    } catch (error: any) {
+        console.error("Failed to create invitation:", error);
+        throw new Error(error.message || "Invitation creation failed");
+    }
 }
 
 /**

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { getInvoice, updateInvoiceStatus } from "@/actions/pricing-actions";
 import { Invoice } from "@/types";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Download, Send, CheckCircle2, CheckCircle } from "lucide-react";
 
 export default function InvoicePublishPage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,6 +14,9 @@ export default function InvoicePublishPage({ params }: { params: Promise<{ id: s
     const printRef = useRef<HTMLDivElement>(null);
     // unwrapping params
     const [unwrappedParams, setUnwrappedParams] = useState<{ id: string } | null>(null);
+    const searchParams = useSearchParams();
+    const type = searchParams.get('type'); // 'quotation' or null
+    const isQuotation = type === 'quotation';
 
     useEffect(() => {
         params.then(setUnwrappedParams);
@@ -43,7 +46,7 @@ export default function InvoicePublishPage({ params }: { params: Promise<{ id: s
             const element = printRef.current;
             const opt = {
                 margin: 10,
-                filename: `請求書_${invoice.client?.name || 'unknown'}_${new Date().toISOString().split('T')[0]}.pdf`,
+                filename: `${isQuotation ? '見積書' : '請求書'}_${invoice.client?.name || 'unknown'}_${new Date().toISOString().split('T')[0]}.pdf`,
                 image: { type: 'jpeg' as const, quality: 0.98 },
                 html2canvas: { scale: 2, useCORS: true },
                 jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
@@ -103,15 +106,13 @@ export default function InvoicePublishPage({ params }: { params: Promise<{ id: s
                             <Send className="w-4 h-4 mr-2" /> 請求書を発行 (ステータス更新)
                         </Button>
                     )}
-                    {isBilled && !isPaid && (
-                        <Button onClick={handlePayment} className="bg-green-600 hover:bg-green-700 text-white">
-                            <CheckCircle className="w-4 h-4 mr-2" /> 入金確認 (完了にする)
-                        </Button>
-                    )}
+                    <Button onClick={handlePayment} className="bg-green-600 hover:bg-green-700 text-white">
+                        <CheckCircle className="w-4 h-4 mr-2" /> 入金確認 (完了にする)
+                    </Button>
                     {isPaid && <div className="text-green-600 font-bold flex items-center"><CheckCircle className="mr-2" /> 支払完了 (Paid)</div>}
                 </div>
                 <Button onClick={handleDownloadPdf} disabled={isDownloading} className="bg-orange-600 hover:bg-orange-700 text-white">
-                    <Download className="w-4 h-4 mr-2" /> {isDownloading ? 'ダウンロード中...' : 'PDFダウンロード'}
+                    <Download className="w-4 h-4 mr-2" /> {isQuotation ? '見積書PDF保存' : (isDownloading ? 'ダウンロード中...' : 'PDFダウンロード')}
                 </Button>
             </div>
 
@@ -121,13 +122,13 @@ export default function InvoicePublishPage({ params }: { params: Promise<{ id: s
                 {/* Header */}
                 <div className="flex justify-between items-start mb-16">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-widest mb-2">ご請求書</h1>
-                        <div className="text-sm underline decoration-1 underline-offset-4">INVOICE</div>
+                        <h1 className="text-3xl font-bold tracking-widest mb-2">{isQuotation ? '御見積書' : 'ご請求書'}</h1>
+                        <div className="text-sm underline decoration-1 underline-offset-4">{isQuotation ? 'QUOTATION' : 'INVOICE'}</div>
                     </div>
                     <div className="text-right text-xs space-y-1">
                         <div>登録番号: T1234567890123</div>
-                        <div>発行日: {issueDate}</div>
-                        <div>請求番号: {invoice.id.substring(0, 8).toUpperCase()}</div>
+                        <div>{isQuotation ? '見積日' : '発行日'}: {issueDate}</div>
+                        <div>{isQuotation ? '見積番号' : '請求番号'}: {invoice.id.substring(0, 8).toUpperCase()}</div>
                     </div>
                 </div>
 
@@ -149,11 +150,11 @@ export default function InvoicePublishPage({ params }: { params: Promise<{ id: s
                 {/* Total Amount Box */}
                 <div className="mb-12">
                     <div className="flex justify-between items-end border-b-4 border-black pb-2">
-                        <div className="text-sm font-bold">御請求金額 (税込)</div>
+                        <div className="text-sm font-bold">{isQuotation ? '御見積金額 (税込)' : '御請求金額 (税込)'}</div>
                         <div className="text-4xl font-bold">¥{invoice.totalAmount.toLocaleString()} -</div>
                     </div>
                     <div className="text-xs mt-2 text-right">
-                        お支払期限: {dueDate}
+                        {isQuotation ? `有効期限: ${dueDate}` : `お支払期限: ${dueDate}`}
                     </div>
                 </div>
 
@@ -231,6 +232,6 @@ export default function InvoicePublishPage({ params }: { params: Promise<{ id: s
                 </div>
 
             </div>
-        </div>
+        </div >
     );
 }

@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { getStaff, upsertStaff, deleteStaff, getClients, getInvoices } from "@/actions/pricing-actions";
+import { getStaff, getClients, getInvoices } from "@/actions/pricing-actions";
 import { createStaffInvitation, getStaffInvitations, deleteInvitation } from "@/actions/invitation-actions";
 import { Staff, Client, Invoice } from "@/types";
-import { Trash2, UserPlus, Pencil, ShieldCheck, Calculator, Link2, Copy, Users, Building2, TrendingUp, Clock } from "lucide-react";
+import { Trash2, ShieldCheck, Calculator, Link2, Copy, Building2, TrendingUp, Clock } from "lucide-react";
 
 export default function StaffPage() {
     const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -17,10 +17,8 @@ export default function StaffPage() {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [invitations, setInvitations] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isEditing, setIsEditing] = useState(false);
-    const [editingStaff, setEditingStaff] = useState<Partial<Staff>>({});
     const [showInviteModal, setShowInviteModal] = useState(false);
-    const [newInvite, setNewInvite] = useState({ email: "", name: "", staffRole: "OPERATIONS" as "OPERATIONS" | "ACCOUNTING" });
+    const [newInviteRole, setNewInviteRole] = useState<"OPERATIONS" | "ACCOUNTING">("OPERATIONS");
     const [generatedLink, setGeneratedLink] = useState<string | null>(null);
 
     useEffect(() => {
@@ -75,44 +73,17 @@ export default function StaffPage() {
         };
     };
 
-    const handleAddNew = () => {
-        setEditingStaff({ name: "", email: "", role: "OPERATIONS" });
-        setIsEditing(true);
-    };
-
-    const handleEdit = (s: Staff) => {
-        setEditingStaff({ ...s });
-        setIsEditing(true);
-    };
-
-    const handleSave = async () => {
-        if (!editingStaff.name) return;
-        setIsLoading(true);
-        await upsertStaff(editingStaff);
-        await loadData();
-        setIsEditing(false);
-    };
-
-    const handleDelete = async (id: string) => {
-        if (confirm("このメンバーを削除してもよろしいですか？")) {
-            setIsLoading(true);
-            await deleteStaff(id);
-            await loadData();
-        }
-    };
-
     const handleCreateInvite = async () => {
         try {
             const result = await createStaffInvitation({
-                email: newInvite.email || undefined,
-                name: newInvite.name || undefined,
-                staffRole: newInvite.staffRole
+                staffRole: newInviteRole
             });
             const link = `${window.location.origin}/invite/${result.token}`;
             setGeneratedLink(link);
             await loadData();
-        } catch (err) {
-            alert("招待リンクの作成に失敗しました");
+        } catch (err: any) {
+            console.error("Invite creation failed:", err);
+            alert("招待リンクの作成に失敗しました: " + (err.message || "Unknown error"));
         }
     };
 
@@ -133,16 +104,11 @@ export default function StaffPage() {
             <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">事業統括・経理管理</h1>
-                    <p className="text-zinc-500">案件を管理する事業統括、および経理スタッフの登録・編集を行います。</p>
+                    <p className="text-zinc-500">スタッフの招待・管理を行います。招待リンクで登録してもらいます。</p>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => { setShowInviteModal(true); setGeneratedLink(null); }}>
-                        <Link2 className="mr-2 h-4 w-4" /> 招待リンク発行
-                    </Button>
-                    <Button onClick={handleAddNew}>
-                        <UserPlus className="mr-2 h-4 w-4" /> スタッフを追加
-                    </Button>
-                </div>
+                <Button onClick={() => { setShowInviteModal(true); setGeneratedLink(null); }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">
+                    <Link2 className="mr-2 h-4 w-4" /> 招待リンク発行
+                </Button>
             </header>
 
             {/* Invite Modal */}
@@ -153,39 +119,20 @@ export default function StaffPage() {
                             <Link2 className="h-5 w-5 text-green-600" />
                             招待リンク発行
                         </CardTitle>
-                        <CardDescription>新しいスタッフを招待するためのリンクを発行します。リンクを共有すると、Google認証で登録できます。</CardDescription>
+                        <CardDescription>役割を選択してリンクを発行。登録者が名前とメールアドレスを入力します。</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {!generatedLink ? (
                             <>
-                                <div className="grid gap-4 md:grid-cols-3">
-                                    <div className="space-y-2">
-                                        <Label>役割 (必須)</Label>
-                                        <Select
-                                            value={newInvite.staffRole}
-                                            onChange={e => setNewInvite({ ...newInvite, staffRole: e.target.value as any })}
-                                        >
-                                            <option value="OPERATIONS">事業統括</option>
-                                            <option value="ACCOUNTING">経理</option>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>名前 (任意)</Label>
-                                        <Input
-                                            value={newInvite.name}
-                                            onChange={e => setNewInvite({ ...newInvite, name: e.target.value })}
-                                            placeholder="田中 太郎"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>メールアドレス (任意)</Label>
-                                        <Input
-                                            type="email"
-                                            value={newInvite.email}
-                                            onChange={e => setNewInvite({ ...newInvite, email: e.target.value })}
-                                            placeholder="staff@example.com"
-                                        />
-                                    </div>
+                                <div className="space-y-2 max-w-xs">
+                                    <Label>役割</Label>
+                                    <Select
+                                        value={newInviteRole}
+                                        onChange={e => setNewInviteRole(e.target.value as any)}
+                                    >
+                                        <option value="OPERATIONS">事業統括</option>
+                                        <option value="ACCOUNTING">経理</option>
+                                    </Select>
                                 </div>
                                 <div className="flex justify-end gap-2">
                                     <Button variant="ghost" onClick={() => setShowInviteModal(false)}>キャンセル</Button>
@@ -215,51 +162,6 @@ export default function StaffPage() {
                 </Card>
             )}
 
-            {isEditing && (
-                <Card className="mb-8 border-blue-200 bg-blue-50/20">
-                    <CardHeader>
-                        <CardTitle>{editingStaff.id ? "スタッフ編集" : "新規スタッフ登録"}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <div className="space-y-2">
-                                <Label>氏名</Label>
-                                <Input
-                                    value={editingStaff.name || ""}
-                                    onChange={e => setEditingStaff({ ...editingStaff, name: e.target.value })}
-                                    placeholder="田中 統括"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>役割 (Role)</Label>
-                                <Select
-                                    value={editingStaff.role}
-                                    onChange={e => setEditingStaff({ ...editingStaff, role: e.target.value as any })}
-                                >
-                                    <option value="OPERATIONS">事業統括 (Operations Lead)</option>
-                                    <option value="ACCOUNTING">経理 (Accounting)</option>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>メールアドレス</Label>
-                                <Input
-                                    type="email"
-                                    value={editingStaff.email || ""}
-                                    onChange={e => setEditingStaff({ ...editingStaff, email: e.target.value })}
-                                    placeholder="staff@example.com"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setIsEditing(false)}>キャンセル</Button>
-                            <Button onClick={handleSave} disabled={isLoading}>
-                                {isLoading ? "保存中..." : "保存"}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
             {/* Pending Invitations */}
             {invitations.filter(i => !i.usedAt && new Date(i.expiresAt) > new Date()).length > 0 && (
                 <Card className="mb-8">
@@ -276,7 +178,6 @@ export default function StaffPage() {
                                             <span className={`px-2 py-0.5 text-xs rounded ${inv.staffRole === 'OPERATIONS' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                                                 {inv.staffRole === 'OPERATIONS' ? '事業統括' : '経理'}
                                             </span>
-                                            <span className="text-sm">{inv.name || inv.email || '未指定'}</span>
                                             <span className="text-xs text-zinc-500">
                                                 期限: {new Date(inv.expiresAt).toLocaleDateString('ja-JP')}
                                             </span>

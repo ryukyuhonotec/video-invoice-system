@@ -20,25 +20,35 @@ export const metadata: Metadata = {
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 
+import { ThemeProvider } from "@/components/theme-provider"
+import pkg from "../../package.json";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-50 dark:bg-zinc-950`}
       >
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 ml-64 flex flex-col">
-            <Header />
-            <div className="flex-1">
-              {children}
-            </div>
-          </main>
-        </div>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <div className="flex min-h-screen">
+            <Sidebar version={pkg.version} />
+            <main className="flex-1 ml-64 flex flex-col">
+              <Header />
+              <div className="flex-1">
+                {children}
+              </div>
+            </main>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

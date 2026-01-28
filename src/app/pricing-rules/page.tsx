@@ -155,7 +155,7 @@ export default function PricingRulesPage() {
                     <h1 className="text-3xl font-bold tracking-tight dark:text-zinc-50">料金ルール管理</h1>
                     <p className="text-zinc-500 dark:text-zinc-400">クライアント（売上）またはパートナー（原価）ごとの料金体系を設定します。</p>
                 </div>
-                <Button onClick={handleAddNew}>+ ルール追加</Button>
+                <Button onClick={handleAddNew} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">+ ルール追加</Button>
             </header>
 
             {isEditing && (
@@ -352,7 +352,7 @@ export default function PricingRulesPage() {
 
                         <div className="flex justify-end gap-2 border-t pt-4">
                             <Button variant="ghost" onClick={() => setIsEditing(false)}>キャンセル</Button>
-                            <Button onClick={handleSave} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
+                            <Button onClick={handleSave} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">
                                 {isLoading ? "保存中..." : "保存"}
                             </Button>
                         </div>

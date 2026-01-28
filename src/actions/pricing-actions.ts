@@ -351,7 +351,8 @@ export async function upsertInvoice(data: any) {
                 duration: task.duration || null,
                 status: task.status || "受注前",
                 description: task.description,
-                deliveryUrl: task.deliveryUrl
+                deliveryUrl: task.deliveryUrl,
+                deliveryNote: task.deliveryNote // NEW
             }))
         }
     }));
@@ -366,6 +367,7 @@ export async function upsertInvoice(data: any) {
         actualDeliveryDate: rest.actualDeliveryDate ? new Date(rest.actualDeliveryDate) : null,
         requestUrl: rest.requestUrl || null,
         deliveryUrl: rest.deliveryUrl || null,
+        deliveryNote: rest.deliveryNote || null, // NEW
         subtotal: Number(rest.subtotal) || 0,
         tax: Number(rest.tax) || 0,
         totalAmount: Number(rest.totalAmount) || 0,
@@ -376,68 +378,78 @@ export async function upsertInvoice(data: any) {
 
     let result;
     try {
-        result = await prisma.invoice.upsert({
-            where: { id: id || 'new' },
-            update: {
-                ...invoiceData,
-                items: {
-                    deleteMany: {},
-                    create: itemsToCreate
+        result = await prisma.$transaction(async (tx) => {
+            const savedInvoice = await tx.invoice.upsert({
+                where: { id: id || 'new' },
+                update: {
+                    ...invoiceData,
+                    items: {
+                        deleteMany: {},
+                        create: itemsToCreate
+                    }
+                },
+                create: {
+                    ...invoiceData,
+                    id: id && !id.startsWith('inv-') ? id : undefined,
+                    createdById: userId || undefined,
+                    items: {
+                        create: itemsToCreate
+                    }
+                },
+            });
+
+            // Audit Log logic
+            if (userId) {
+                if (existingInvoice) {
+                    if (existingInvoice.status !== savedInvoice.status) {
+                        await tx.auditLog.create({
+                            data: {
+                                action: "STATUS_CHANGE",
+                                targetId: savedInvoice.id,
+                                targetType: "INVOICE",
+                                details: `${existingInvoice.status} -> ${savedInvoice.status}`,
+                                userId: userId
+                            }
+                        });
+                    } else {
+                        // Log update action if not status change? Optional, but good for tracking edits.
+                        await tx.auditLog.create({
+                            data: {
+                                action: "UPDATE",
+                                targetId: savedInvoice.id,
+                                targetType: "INVOICE",
+                                details: "Updated Invoice details",
+                                userId: userId
+                            }
+                        });
+                    }
+                } else {
+                    await tx.auditLog.create({
+                        data: {
+                            action: "CREATE",
+                            targetId: savedInvoice.id,
+                            targetType: "INVOICE",
+                            details: "Created Invoice",
+                            userId: userId
+                        }
+                    });
                 }
-            },
-            create: {
-                ...invoiceData,
-                id: id && !id.startsWith('inv-') ? id : undefined,
-                createdById: userId || undefined,
-                items: {
-                    create: itemsToCreate
-                }
-            },
+            }
+
+            return savedInvoice;
         });
     } catch (error: any) {
         console.error("UPSERT ERROR DETAILS:", error.message);
         console.error("ERROR META:", JSON.stringify(error.meta, null, 2));
-        throw error;
-    }
-
-    // Audit Log logic
-    // We check if productionStatus of ITEMS changed? Or just MAIN invoice status?
-    // The requirement was: "Log who changed status".
-    // Invoice has a main status, and items have productionStatus.
-    // Dashboard filter is on PRODUCTION STATUS (Item level).
-    // Let's log if the Invoice Main Status changes, OR if it's a new invoice.
-
-    // Only create audit logs if we have a user ID
-    if (userId) {
-        if (existingInvoice) {
-            if (existingInvoice.status !== result.status) {
-                await prisma.auditLog.create({
-                    data: {
-                        action: "STATUS_CHANGE",
-                        targetId: result.id,
-                        targetType: "INVOICE",
-                        details: `${existingInvoice.status} -> ${result.status}`,
-                        userId: userId
-                    }
-                });
-            }
-        } else {
-            await prisma.auditLog.create({
-                data: {
-                    action: "CREATE",
-                    targetId: result.id,
-                    targetType: "INVOICE",
-                    details: "Created Invoice",
-                    userId: userId
-                }
-            });
-        }
+        return { success: false, error: error.message || "Failed to save invoice" };
     }
 
     revalidatePath('/');
     revalidatePath('/invoices/[id]', 'page');
     revalidatePath('/invoices/[id]', 'page');
-    return result;
+    revalidatePath('/invoices/new', 'page');
+
+    return { success: true, data: result };
 }
 
 export async function updateInvoiceStatus(id: string, status: string) {
