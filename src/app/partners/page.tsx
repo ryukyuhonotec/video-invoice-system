@@ -471,81 +471,100 @@ function PartnersPageContent() {
                                     </tr>
                                 </thead>
                                 <tbody className="[&_tr:last-child]:border-0 p-0">
-                                    {partners.map((p) => {
-                                        const partnerClients = getPartnerClients(p);
-                                        return (
-                                            <tr
-                                                key={p.id}
-                                                className="border-b transition-colors hover:bg-blue-50 cursor-pointer dark:border-zinc-700 dark:hover:bg-blue-900/30"
-                                                onClick={() => router.push(`/partners/${p.id}`)}
-                                            >
-                                                <td className="p-4 align-middle">
-                                                    <div className="flex items-center gap-1">
-                                                        {p.chatworkGroup ? (
-                                                            <a
-                                                                href={p.chatworkGroup}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="text-blue-600 font-bold dark:text-blue-400 hover:underline flex items-center gap-1 group"
-                                                            >
-                                                                {p.name}
-                                                                <span className="transition-opacity">↗</span>
-                                                            </a>
-                                                        ) : (
-                                                            <span className="font-bold text-zinc-900 dark:text-zinc-100">{p.name}</span>
-                                                        )}
-                                                        {p.isArchived && (
-                                                            <span className="text-[10px] bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded text-zinc-600 dark:text-zinc-300">
-                                                                Archived
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {p.position && <span className="text-xs text-zinc-500 dark:text-zinc-500">{p.position}</span>}
-                                                </td>
-                                                <td className="p-4 align-middle">
-                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold
+                                    {partners.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="h-48 text-center align-middle">
+                                                <div className="flex flex-col items-center justify-center text-zinc-500">
+                                                    <Search className="h-8 w-8 mb-2 opacity-20" />
+                                                    <p className="text-lg font-medium">パートナーが見つかりません</p>
+                                                    <p className="text-sm text-zinc-400 mb-4">条件を変更するか、新しいパートナーを登録してください。</p>
+                                                    <Button variant="outline" onClick={handleAddNew} className="dark:bg-zinc-800 dark:text-zinc-100">
+                                                        <Plus className="mr-2 h-4 w-4" /> パートナー登録
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        partners.map((p) => {
+                                            const partnerClients = getPartnerClients(p);
+                                            return (
+                                                <tr
+                                                    key={p.id}
+                                                    className="border-b transition-colors hover:bg-blue-50 cursor-pointer dark:border-zinc-700 dark:hover:bg-blue-900/30"
+                                                    onClick={() => router.push(`/partners/${p.id}`)}
+                                                >
+                                                    <td className="p-4 align-middle">
+                                                        <div className="flex items-center gap-1">
+                                                            {p.chatworkGroup ? (
+                                                                <a
+                                                                    href={p.chatworkGroup}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="text-blue-600 font-bold dark:text-blue-400 hover:underline flex items-center gap-1 group"
+                                                                >
+                                                                    {p.name}
+                                                                    <span className="transition-opacity">↗</span>
+                                                                </a>
+                                                            ) : (
+                                                                <span className="font-bold text-zinc-900 dark:text-zinc-100">{p.name}</span>
+                                                            )}
+                                                            {p.isArchived && (
+                                                                <span className="text-[10px] bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded text-zinc-600 dark:text-zinc-300">
+                                                                    Archived
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {p.position && <span className="text-xs text-zinc-500 dark:text-zinc-500">{p.position}</span>}
+                                                    </td>
+                                                    <td className="p-4 align-middle">
+                                                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold
                                                         ${p.role === 'ディレクター' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300' :
-                                                            p.role === 'カメラマン' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' :
-                                                                p.role === 'エディター' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' :
-                                                                    'bg-gray-100 text-gray-800 dark:bg-zinc-800 dark:text-zinc-300'}`}>
-                                                        {p.role}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4 align-middle text-xs text-muted-foreground dark:text-zinc-400">
-                                                    {p.email ? <div>📧 {p.email}</div> : "-"}
-                                                </td>
-                                                <td className="p-4 align-middle">
-                                                    {partnerClients.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {partnerClients.slice(0, 3).map((name, idx) => (
-                                                                <span key={idx} className="text-[10px] bg-cyan-100 text-cyan-700 px-1.5 rounded dark:bg-cyan-900/40 dark:text-cyan-300">
-                                                                    {name}
-                                                                </span>
-                                                            ))}
-                                                            {partnerClients.length > 3 && (
-                                                                <span className="text-[10px] text-zinc-500 dark:text-zinc-400">+{partnerClients.length - 3}</span>
-                                                            )}
-                                                        </div>
-                                                    ) : <span className="dark:text-zinc-500">-</span>}
-                                                </td>
-                                                <td className="p-4 align-middle">
-                                                    {p.pricingRules && p.pricingRules.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {p.pricingRules.slice(0, 2).map((r: any) => (
-                                                                <span key={r.id} className="text-[10px] bg-amber-100 text-amber-800 px-1 rounded dark:bg-amber-900/40 dark:text-amber-300">
-                                                                    {r.name}
-                                                                </span>
-                                                            ))}
-                                                            {p.pricingRules.length > 2 && (
-                                                                <span className="text-[10px] text-zinc-500 dark:text-zinc-400">+{p.pricingRules.length - 2}</span>
-                                                            )}
-                                                        </div>
-                                                    ) : <span className="dark:text-zinc-500">-</span>}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                                p.role === 'カメラマン' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' :
+                                                                    p.role === 'エディター' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' :
+                                                                        'bg-gray-100 text-gray-800 dark:bg-zinc-800 dark:text-zinc-300'}`}>
+                                                            {p.role}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 align-middle text-xs text-muted-foreground dark:text-zinc-400">
+                                                        {p.email ? (
+                                                            <a href={`mailto:${p.email}`} className="flex items-center gap-1 hover:text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                                                                <span>📧</span> {p.email}
+                                                            </a>
+                                                        ) : "-"}
+                                                    </td>
+                                                    <td className="p-4 align-middle">
+                                                        {partnerClients.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {partnerClients.slice(0, 3).map((name, idx) => (
+                                                                    <span key={idx} className="text-[10px] bg-cyan-100 text-cyan-700 px-1.5 rounded dark:bg-cyan-900/40 dark:text-cyan-300">
+                                                                        {name}
+                                                                    </span>
+                                                                ))}
+                                                                {partnerClients.length > 3 && (
+                                                                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400">+{partnerClients.length - 3}</span>
+                                                                )}
+                                                            </div>
+                                                        ) : <span className="dark:text-zinc-500">-</span>}
+                                                    </td>
+                                                    <td className="p-4 align-middle">
+                                                        {p.pricingRules && p.pricingRules.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {p.pricingRules.slice(0, 2).map((r: any) => (
+                                                                    <span key={r.id} className="text-[10px] bg-amber-100 text-amber-800 px-1 rounded dark:bg-amber-900/40 dark:text-amber-300">
+                                                                        {r.name}
+                                                                    </span>
+                                                                ))}
+                                                                {p.pricingRules.length > 2 && (
+                                                                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400">+{p.pricingRules.length - 2}</span>
+                                                                )}
+                                                            </div>
+                                                        ) : <span className="dark:text-zinc-500">-</span>}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
                                 </tbody>
                             </table>
                         </div>
