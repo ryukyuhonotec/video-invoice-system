@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { getClients, getPartners, getPricingRules, upsertInvoice, getStaff } from "@/actions/pricing-actions";
 import { calculatePrice } from "@/lib/pricing";
 import { Invoice, InvoiceItem, InvoiceStatus, Client, Partner, PricingRule, Outsource, Staff } from "@/types";
-import { PlusCircle, Save, Calendar, ShieldCheck, FileText, Search, ClipboardList, AlertTriangle, AlertCircle, Loader2 } from "lucide-react";
+import { PlusCircle, Save, Calendar, ShieldCheck, FileText, Search, ClipboardList, AlertTriangle, AlertCircle, Loader2, HelpCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     AlertDialog,
@@ -754,7 +754,16 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                                 <div className="text-xl font-mono text-red-400">¥{totalCost.toLocaleString()}</div>
                             </div>
                             <div className="flex flex-col items-end border-l border-zinc-200 pl-6 dark:border-zinc-700">
-                                <div className="text-[10px] text-green-500 uppercase font-bold tracking-widest mb-0.5">粗利</div>
+                                <div className="text-[10px] text-green-500 uppercase font-bold tracking-widest mb-0.5 flex items-center gap-1">
+                                    粗利
+                                    <div className="group relative">
+                                        <HelpCircle className="w-3 h-3 text-zinc-400 cursor-help" />
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-zinc-800 text-white text-[10px] rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                            売上(税抜) - 原価(税抜) <br />
+                                            ※消費税は計算に含まれません
+                                        </div>
+                                    </div>
+                                </div>
                                 <div className="flex items-baseline gap-2">
                                     <span className="text-xs text-zinc-500">{profitMargin.toFixed(0)}%</span>
                                     <div className={`text-xl font-mono font-bold ${profitMargin > 30 ? 'text-green-600' : 'text-orange-500'}`}>

@@ -430,47 +430,62 @@ export default function PricingRulesPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y dark:divide-zinc-700">
-                                {rules.filter(r => {
-                                    if (!ruleSearch) return true;
-                                    const query = ruleSearch.toLowerCase();
-                                    return r.name?.toLowerCase().includes(query) ||
-                                        r.description?.toLowerCase().includes(query) ||
-                                        r.clients?.some((c: any) => c.name?.toLowerCase().includes(query)) ||
-                                        r.partners?.some((p: any) => p.name?.toLowerCase().includes(query));
-                                }).map((rule) => (
-                                    <tr
-                                        key={rule.id}
-                                        className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
-                                        onClick={() => handleEdit(rule)}
-                                    >
-                                        <td className="p-4">
-                                            <div className="font-bold text-zinc-900 dark:text-zinc-100">{rule.name}</div>
-                                            {rule.description && <div className="text-xs text-zinc-500 dark:text-zinc-400">{rule.description}</div>}
-                                            {rule.isDefault && <span className="inline-block mt-1 text-[10px] bg-zinc-200 text-zinc-600 px-2 py-0.5 rounded font-bold dark:bg-zinc-700 dark:text-zinc-300">DEFAULT</span>}
-                                        </td>
-                                        <td className="p-4 text-xs">
-                                            {rule.type === 'FIXED' && <span className="text-zinc-600 dark:text-zinc-400">固定</span>}
-                                            {rule.type === 'STEPPED' && <span className="text-zinc-600 dark:text-zinc-400">階段</span>}
-                                            {rule.type === 'LINEAR' && <span className="text-zinc-600 dark:text-zinc-400">従量</span>}
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="flex flex-wrap gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-                                                {rule.clients?.length ? <span>{rule.clients.length} クライアント</span> : null}
-                                                {rule.clients?.length && rule.partners?.length ? <span>・</span> : null}
-                                                {rule.partners?.length ? <span>{rule.partners.length} パートナー</span> : null}
-                                                {!rule.clients?.length && !rule.partners?.length && <span className="italic">汎用</span>}
+                                {rules.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="h-48 text-center align-middle">
+                                            <div className="flex flex-col items-center justify-center text-zinc-500">
+                                                <Search className="h-8 w-8 mb-2 opacity-20" />
+                                                <p className="text-lg font-medium">料金ルールが見つかりません</p>
+                                                <p className="text-sm text-zinc-400 mb-4">新しいルールを追加して、料金計算を自動化しましょう。</p>
+                                                <Button variant="outline" onClick={handleAddNew} className="dark:bg-zinc-800 dark:text-zinc-100">
+                                                    + ルール追加
+                                                </Button>
                                             </div>
                                         </td>
-                                        <td className="p-4 text-xs font-mono dark:text-zinc-300">
-                                            {rule.type === 'FIXED' && <div>売: ¥{rule.fixedPrice?.toLocaleString()} / 原: ¥{rule.fixedCost?.toLocaleString()}</div>}
-                                            {rule.type === 'STEPPED' && <div>階段設定あり</div>}
-                                            {rule.type === 'LINEAR' && <div>¥{rule.incrementalUnitPrice?.toLocaleString()} / {rule.incrementalUnit}分</div>}
-                                        </td>
-                                        <td className="p-4 text-right" onClick={e => e.stopPropagation()}>
-                                            <Button variant="ghost" size="sm" onClick={() => handleDelete(rule.id)} className="h-8 text-red-500 hover:text-red-700 dark:hover:text-red-400">削除</Button>
-                                        </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    rules.filter(r => {
+                                        if (!ruleSearch) return true;
+                                        const query = ruleSearch.toLowerCase();
+                                        return r.name?.toLowerCase().includes(query) ||
+                                            r.description?.toLowerCase().includes(query) ||
+                                            r.clients?.some((c: any) => c.name?.toLowerCase().includes(query)) ||
+                                            r.partners?.some((p: any) => p.name?.toLowerCase().includes(query));
+                                    }).map((rule) => (
+                                        <tr
+                                            key={rule.id}
+                                            className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                                            onClick={() => handleEdit(rule)}
+                                        >
+                                            <td className="p-4">
+                                                <div className="font-bold text-zinc-900 dark:text-zinc-100">{rule.name}</div>
+                                                {rule.description && <div className="text-xs text-zinc-500 dark:text-zinc-400">{rule.description}</div>}
+                                                {rule.isDefault && <span className="inline-block mt-1 text-[10px] bg-zinc-200 text-zinc-600 px-2 py-0.5 rounded font-bold dark:bg-zinc-700 dark:text-zinc-300">DEFAULT</span>}
+                                            </td>
+                                            <td className="p-4 text-xs">
+                                                {rule.type === 'FIXED' && <span className="text-zinc-600 dark:text-zinc-400">固定</span>}
+                                                {rule.type === 'STEPPED' && <span className="text-zinc-600 dark:text-zinc-400">階段</span>}
+                                                {rule.type === 'LINEAR' && <span className="text-zinc-600 dark:text-zinc-400">従量</span>}
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="flex flex-wrap gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+                                                    {rule.clients?.length ? <span>{rule.clients.length} クライアント</span> : null}
+                                                    {rule.clients?.length && rule.partners?.length ? <span>・</span> : null}
+                                                    {rule.partners?.length ? <span>{rule.partners.length} パートナー</span> : null}
+                                                    {!rule.clients?.length && !rule.partners?.length && <span className="italic">汎用</span>}
+                                                </div>
+                                            </td>
+                                            <td className="p-4 text-xs font-mono dark:text-zinc-300">
+                                                {rule.type === 'FIXED' && <div>売: ¥{rule.fixedPrice?.toLocaleString()} / 原: ¥{rule.fixedCost?.toLocaleString()}</div>}
+                                                {rule.type === 'STEPPED' && <div>階段設定あり</div>}
+                                                {rule.type === 'LINEAR' && <div>¥{rule.incrementalUnitPrice?.toLocaleString()} / {rule.incrementalUnit}分</div>}
+                                            </td>
+                                            <td className="p-4 text-right" onClick={e => e.stopPropagation()}>
+                                                <Button variant="ghost" size="sm" onClick={() => handleDelete(rule.id)} className="h-8 text-red-500 hover:text-red-700 dark:hover:text-red-400">削除</Button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
