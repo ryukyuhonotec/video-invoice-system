@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { getPricingRules, upsertPricingRule, deletePricingRule, getClients, getPartners } from "@/actions/pricing-actions";
 import { PricingRule, Client, Partner, PricingType, PricingStep } from "@/types";
-import { Search, Plus, Trash2 } from "lucide-react";
+import { Search, Plus, Trash2, Loader2 } from "lucide-react";
 
 export default function PricingRulesPage() {
     const [rules, setRules] = useState<PricingRule[]>([]);
@@ -231,8 +231,8 @@ export default function PricingRulesPage() {
                                     value={scope}
                                     onChange={e => setScope(e.target.value as "GENERIC" | "INDIVIDUAL")}
                                 >
-                                    <option value="GENERIC">汎用ルール (Generic)</option>
-                                    <option value="INDIVIDUAL">個別指定 (Individual)</option>
+                                    <option value="GENERIC">汎用ルール (全案件・全パートナー)</option>
+                                    <option value="INDIVIDUAL">個別指定 (特定のクライアント/パートナー)</option>
                                 </Select>
                             </div>
                         </div>
@@ -266,7 +266,7 @@ export default function PricingRulesPage() {
                         <div className="grid gap-6 md:grid-cols-2">
                             <div className="space-y-4 border p-4 rounded-lg bg-white dark:bg-zinc-900 dark:border-zinc-700 shadow-sm">
                                 <h3 className="font-bold text-blue-700 dark:text-blue-400 border-b dark:border-zinc-700 pb-2 flex justify-between items-center">
-                                    受注価格設定 (Revenue)
+                                    受注価格設定
                                 </h3>
                                 <div className="space-y-4">
                                     {editingRule.type === 'FIXED' && (
@@ -281,18 +281,19 @@ export default function PricingRulesPage() {
                                                 <Label>階段設定 (売上)</Label>
                                                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={addStep}>+ 追加</Button>
                                             </div>
+
                                             {/* Header Labels (Improvement #7) */}
                                             {((editingRule.steps as PricingStep[])?.length > 0) && (
-                                                <div className="flex gap-1 text-xs text-zinc-500 px-1 mb-1">
-                                                    <span className="w-20">上限(分)</span>
+                                                <div className="flex gap-1 text-xs text-zinc-500 px-1 mb-1 font-bold">
+                                                    <span className="w-20 pl-1">基準(分以下)</span>
                                                     <span className="flex-1 ml-6">金額(円)</span>
                                                 </div>
                                             )}
+
                                             {((editingRule.steps as PricingStep[]) || []).map((step, index) => (
                                                 <div key={index} className="flex gap-1 items-center">
-                                                    <Input placeholder="分" type="number" value={step.upTo} onChange={e => updateStep(index, 'upTo', parseFloat(e.target.value))} className="w-20 h-8 text-xs" />
-                                                    <span className="text-[10px] text-zinc-500">分迄</span>
-                                                    <Input placeholder="金額" type="number" value={step.price} onChange={e => updateStep(index, 'price', parseFloat(e.target.value))} className="flex-1 h-8 text-xs" />
+                                                    <Input placeholder="分" type="number" value={step.upTo} onChange={e => updateStep(index, 'upTo', parseFloat(e.target.value))} className="w-20 h-8 text-xs dark:bg-zinc-800" />
+                                                    <Input placeholder="金額" type="number" value={step.price} onChange={e => updateStep(index, 'price', parseFloat(e.target.value))} className="flex-1 h-8 text-xs dark:bg-zinc-800" />
                                                     <Button size="sm" variant="ghost" onClick={() => removeStep(index)}><Trash2 className="w-3 h-3 text-zinc-400 hover:text-red-500" /></Button>
                                                 </div>
                                             ))}
@@ -315,7 +316,7 @@ export default function PricingRulesPage() {
 
                             <div className="space-y-4 border p-4 rounded-lg bg-white dark:bg-zinc-900 dark:border-zinc-700 shadow-sm">
                                 <h3 className="font-bold text-red-700 dark:text-red-400 border-b dark:border-zinc-700 pb-2 flex justify-between items-center">
-                                    発注原価設定 (Cost)
+                                    発注原価設定
                                 </h3>
                                 <div className="space-y-4">
                                     {editingRule.type === 'FIXED' && (
@@ -333,26 +334,27 @@ export default function PricingRulesPage() {
                                                     setEditingRule({ ...editingRule, costSteps: [...current, { upTo: 0, price: 0 }] as any });
                                                 }}>+ 追加</Button>
                                             </div>
+
                                             {/* Header Labels (Improvement #7) */}
                                             {((editingRule.costSteps as any as PricingStep[])?.length > 0) && (
-                                                <div className="flex gap-1 text-xs text-zinc-500 px-1 mb-1">
-                                                    <span className="w-20">上限(分)</span>
+                                                <div className="flex gap-1 text-xs text-zinc-500 px-1 mb-1 font-bold">
+                                                    <span className="w-20 pl-1">基準(分以下)</span>
                                                     <span className="flex-1 ml-6">金額(円)</span>
                                                 </div>
                                             )}
+
                                             {((editingRule.costSteps as any as PricingStep[]) || []).map((step, index) => (
                                                 <div key={index} className="flex gap-1 items-center">
                                                     <Input placeholder="分" type="number" value={step.upTo} onChange={e => {
                                                         const steps = [...(editingRule.costSteps as any as PricingStep[])];
                                                         steps[index] = { ...steps[index], upTo: parseFloat(e.target.value) };
                                                         setEditingRule({ ...editingRule, costSteps: steps as any });
-                                                    }} className="w-20 h-8 text-xs" />
-                                                    <span className="text-[10px] text-zinc-500">分迄</span>
+                                                    }} className="w-20 h-8 text-xs dark:bg-zinc-800" />
                                                     <Input placeholder="金額" type="number" value={step.price} onChange={e => {
                                                         const steps = [...(editingRule.costSteps as any as PricingStep[])];
                                                         steps[index] = { ...steps[index], price: parseFloat(e.target.value) };
                                                         setEditingRule({ ...editingRule, costSteps: steps as any });
-                                                    }} className="flex-1 h-8 text-xs" />
+                                                    }} className="flex-1 h-8 text-xs dark:bg-zinc-800" />
                                                     <Button size="sm" variant="ghost" onClick={() => {
                                                         const steps = [...(editingRule.costSteps as any as PricingStep[])];
                                                         steps.splice(index, 1);
@@ -382,7 +384,7 @@ export default function PricingRulesPage() {
                         <div className="flex justify-end gap-2 border-t pt-4">
                             <Button variant="ghost" onClick={() => setIsEditing(false)}>キャンセル</Button>
                             <Button onClick={handleSave} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">
-                                {isLoading ? "保存中..." : "保存"}
+                                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 保存中...</> : "保存"}
                             </Button>
                         </div>
                     </CardContent>

@@ -45,6 +45,7 @@ export function InvoiceItemRow({
                     <Label className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">品目名</Label>
                     <Input
                         value={item.name || ""}
+                        id={`items.${itemIndex}.name`}
                         onChange={(e) => updateItem(itemIndex, 'name', e.target.value)}
                         className={`bg-zinc-700/50 border-zinc-600 text-white placeholder:text-zinc-500 h-9 ${nameError ? "border-red-400 bg-red-900/50" : ""}`}
                         placeholder="〇〇様 PR動画"
