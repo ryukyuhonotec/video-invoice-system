@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { getClients, getPartners, getPricingRules, upsertInvoice, getStaff } from "@/actions/pricing-actions";
 import { calculatePrice } from "@/lib/pricing";
 import { Invoice, InvoiceItem, InvoiceStatus, Client, Partner, PricingRule, Outsource, Staff } from "@/types";
-import { PlusCircle, Save, Calendar, ShieldCheck, FileText, Search, ClipboardList, AlertTriangle, AlertCircle } from "lucide-react";
+import { PlusCircle, Save, Calendar, ShieldCheck, FileText, Search, ClipboardList, AlertTriangle, AlertCircle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     AlertDialog,
@@ -358,8 +358,43 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
     const handleInitialSave = async (setDeliveredStatus = false) => {
         // Validation & Discrepancy Check
         if (!validateForm()) {
-            const errorCount = Object.keys(validationErrors).length || 1; // At least 1 if we're here
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // Calculate errors strictly to find target ID immediately
+            let targetId = "";
+            if (!selectedClientId) {
+                targetId = "clientId";
+            } else {
+                for (let i = 0; i < items.length; i++) {
+                    if (!items[i].name || !items[i].name!.trim()) {
+                        targetId = `items.${i}.name`;
+                        break;
+                    }
+                    if (items[i].outsources) {
+                        for (let j = 0; j < items[i].outsources!.length; j++) {
+                            if (!items[i].outsources![j].pricingRuleId) {
+                                targetId = `items.${i}.outsources.${j}.pricingRuleId`;
+                                break;
+                            }
+                        }
+                    }
+                    if (targetId) break;
+                }
+            }
+
+            if (targetId) {
+                // Small timeout to allow React to render any error states/classes if needed, though ID should exist
+                setTimeout(() => {
+                    const el = document.getElementById(targetId);
+                    if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        // Try to focus
+                        el.focus();
+                    } else {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                }, 100);
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
             return;
         }
 
@@ -561,10 +596,11 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                             </Select>
                         </div>
                         <div className="md:col-span-5 space-y-1 relative">
-                            <Label className="text-xs text-zinc-500 dark:text-zinc-400">クライアント検索</Label>
+                            <Label className="text-xs text-zinc-500 dark:text-zinc-400" htmlFor="clientId">クライアント検索</Label>
                             <div className={`relative ${validationErrors['clientId'] ? 'ring-2 ring-red-500 rounded-md' : ''}`}>
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
                                 <Input
+                                    id="clientId"
                                     value={clientSearchQuery}
                                     onChange={(e) => { setClientSearchQuery(e.target.value); setShowClientDropdown(true); }}
                                     onFocus={() => setShowClientDropdown(true)}
@@ -615,15 +651,15 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                         <div className="md:col-span-2 space-y-1">
                             <Label className="text-xs text-zinc-500 dark:text-zinc-400">案件ステータス</Label>
                             <Select value={invoiceStatus} onChange={(e) => setInvoiceStatus(e.target.value as InvoiceStatus)} className="h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
-                                <option value={InvoiceStatusEnum.DRAFT}>{InvoiceStatusEnum.DRAFT}</option>
-                                <option value={InvoiceStatusEnum.IN_PROGRESS}>{InvoiceStatusEnum.IN_PROGRESS}</option>
+                                <option value={InvoiceStatusEnum.DRAFT}>受注前 (Draft)</option>
+                                <option value={InvoiceStatusEnum.IN_PROGRESS}>進行中 (In Progress)</option>
                                 {((isEditing && initialData?.status !== InvoiceStatusEnum.DRAFT) || ([InvoiceStatusEnum.DELIVERED, InvoiceStatusEnum.BILLED, InvoiceStatusEnum.SENT, InvoiceStatusEnum.COMPLETED, InvoiceStatusEnum.LOST] as string[]).includes(invoiceStatus)) && (
                                     <>
-                                        <option value={InvoiceStatusEnum.DELIVERED}>{InvoiceStatusEnum.DELIVERED}</option>
-                                        <option value={InvoiceStatusEnum.BILLED}>{InvoiceStatusEnum.BILLED}</option>
-                                        <option value={InvoiceStatusEnum.SENT}>{InvoiceStatusEnum.SENT}</option>
-                                        <option value={InvoiceStatusEnum.COMPLETED}>{InvoiceStatusEnum.COMPLETED} (途中終了)</option>
-                                        <option value={InvoiceStatusEnum.LOST}>{InvoiceStatusEnum.LOST}</option>
+                                        <option value={InvoiceStatusEnum.DELIVERED}>納品済 (Delivered)</option>
+                                        <option value={InvoiceStatusEnum.BILLED}>請求済 (Billed)</option>
+                                        <option value={InvoiceStatusEnum.SENT}>送付済 (Sent)</option>
+                                        <option value={InvoiceStatusEnum.COMPLETED}>完了 (Completed)</option>
+                                        <option value={InvoiceStatusEnum.LOST}>失注 (Lost)</option>
                                     </>
                                 )}
                             </Select>
@@ -670,7 +706,7 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
 
             {/* Top Error Message */}
             {Object.keys(validationErrors).length > 0 && (
-                <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2 fade-in">
+                <div className="fixed bottom-32 right-4 z-50 animate-in slide-in-from-bottom-2 fade-in">
                     <div className="bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
                         <AlertTriangle className="w-5 h-5" />
                         <span className="font-bold">入力エラーがあります。確認してください。</span>
@@ -678,7 +714,10 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 text-white hover:bg-white/20 rounded-full"
-                            onClick={() => setValidationErrors({})}
+                            onClick={() => {
+                                setValidationErrors({});
+                                // Also clear error summary scroll
+                            }}
                         >
                             ×
                         </Button>
@@ -701,43 +740,46 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                 isSaving={isSaving}
             />
 
-            {/* ===== Summary ===== */}
-            <Card className="shadow-lg border-zinc-300 overflow-hidden">
-                <CardFooter className="flex flex-wrap justify-end p-6 bg-zinc-900 text-white gap-x-8 gap-y-4">
-                    <div className="flex flex-col items-end">
-                        <div className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest mb-1">売上</div>
-                        <div className="text-xl sm:text-2xl font-mono text-white">¥{totalRevenue.toLocaleString()}</div>
-                        <div className="text-[10px] text-zinc-500">(税込)</div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                        <div className="text-[10px] text-red-400 uppercase font-bold tracking-widest mb-1">原価</div>
-                        <div className="text-xl sm:text-2xl font-mono text-red-400">¥{totalCost.toLocaleString()}</div>
-                    </div>
-                    <div className="flex flex-col items-end border-l border-zinc-700 pl-8">
-                        <div className="text-[10px] text-green-400 uppercase font-bold tracking-widest mb-1">粗利</div>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-xs text-zinc-500">{profitMargin.toFixed(0)}%</span>
-                            <div className={`text-xl sm:text-2xl font-mono font-bold ${profitMargin > 30 ? 'text-green-500' : 'text-orange-500'}`}>
-                                ¥{estimatedProfit.toLocaleString()}
+            {/* ===== Summary & Sticky Footer (Issue #12) ===== */}
+            <div className="sticky bottom-0 z-40 bg-background/80 backdrop-blur-sm border-t shadow-lg pb-4 pt-2 -mx-4 px-4 sm:-mx-8 sm:px-8">
+                <Card className="shadow-none border-0 bg-transparent">
+                    <CardFooter className="flex flex-wrap justify-end p-2 gap-x-8 gap-y-2 items-center">
+                        <div className="flex gap-6 mr-auto items-center">
+                            <div className="flex flex-col items-end">
+                                <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-0.5">売上</div>
+                                <div className="text-xl font-mono text-zinc-900 dark:text-zinc-100">¥{totalRevenue.toLocaleString()}</div>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <div className="text-[10px] text-red-400 uppercase font-bold tracking-widest mb-0.5">原価</div>
+                                <div className="text-xl font-mono text-red-400">¥{totalCost.toLocaleString()}</div>
+                            </div>
+                            <div className="flex flex-col items-end border-l border-zinc-200 pl-6 dark:border-zinc-700">
+                                <div className="text-[10px] text-green-500 uppercase font-bold tracking-widest mb-0.5">粗利</div>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-xs text-zinc-500">{profitMargin.toFixed(0)}%</span>
+                                    <div className={`text-xl font-mono font-bold ${profitMargin > 30 ? 'text-green-600' : 'text-orange-500'}`}>
+                                        ¥{estimatedProfit.toLocaleString()}
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </CardFooter>
-            </Card>
 
-            <div className="flex justify-end gap-4 p-4 mb-20">
-                <Button variant="ghost" size="lg" onClick={() => router.back()}>戻る</Button>
-                {/* Send Button Removed as per user request */}
-                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 h-12 font-bold shadow-xl" onClick={() => handleInitialSave(false)} disabled={isSaving}>
-                    <Save className="mr-2 h-5 w-5" /> {isSaving ? '保存中...' : '保存'}
-                </Button>
-                {/* Quotation Button - Only if 受注前 (Pre-order) */}
-                {invoiceStatus === InvoiceStatusEnum.DRAFT && (
-                    <Button size="lg" variant="outline" className="border-cyan-500 text-cyan-600 hover:bg-cyan-50 px-6 h-12 font-bold" onClick={handleCreateQuotation} disabled={isSaving}>
-                        <FileText className="mr-2 h-5 w-5" /> 見積書作成
-                    </Button>
-                )}
+                        <div className="flex gap-3">
+                            <Button variant="ghost" size="lg" onClick={() => router.back()}>戻る</Button>
+                            {/* Quotation Button - Only if 受注前 */}
+                            {invoiceStatus === InvoiceStatusEnum.DRAFT && (
+                                <Button size="lg" variant="outline" className="hidden sm:flex border-cyan-500 text-cyan-600 hover:bg-cyan-50 px-6 font-bold" onClick={handleCreateQuotation} disabled={isSaving}>
+                                    <FileText className="mr-2 h-5 w-5" /> 見積書作成
+                                </Button>
+                            )}
+                            <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 h-12 font-bold shadow-xl" onClick={() => handleInitialSave(false)} disabled={isSaving}>
+                                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 保存中...</> : <><Save className="mr-2 h-5 w-5" /> 保存</>}
+                            </Button>
+                        </div>
+                    </CardFooter>
+                </Card>
             </div>
         </div >
     );
 }
+

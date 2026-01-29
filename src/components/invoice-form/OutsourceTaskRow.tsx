@@ -105,6 +105,7 @@ export function OutsourceTaskRow({
                     <SearchableSelect
                         className={`text-xs h-9 bg-white ${ruleError ? "border-red-500" : ""}`}
                         value={task.pricingRuleId || ""}
+                        id={`items.${itemIndex}.outsources.${taskIndex}.pricingRuleId`}
                         onChange={(val) => updateTask(itemIndex, taskIndex, 'pricingRuleId', val)}
                         options={availableRules.map(r => ({ label: r.name, value: r.id }))}
                         placeholder="ルールを選択..."
@@ -117,6 +118,7 @@ export function OutsourceTaskRow({
                     <SearchableSelect
                         className="text-xs h-9 bg-white"
                         value={task.partnerId || ""}
+                        id={`items.${itemIndex}.outsources.${taskIndex}.partnerId`}
                         onChange={(val) => updateTask(itemIndex, taskIndex, 'partnerId', val)}
                         disabled={!task.pricingRuleId}
                         options={finalPartnerOptions.map(p => ({ label: p.name, value: p.id }))}
@@ -130,6 +132,7 @@ export function OutsourceTaskRow({
                     <Select
                         className="text-xs h-9 bg-white"
                         value={task.status || TaskStatusEnum.PRE_ORDER}
+                        id={`items.${itemIndex}.outsources.${taskIndex}.status`}
                         onChange={(e) => updateTask(itemIndex, taskIndex, 'status', e.target.value)}
                     >
                         <option value={TaskStatusEnum.PRE_ORDER}>{TaskStatusEnum.PRE_ORDER}</option>

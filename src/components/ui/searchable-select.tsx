@@ -30,6 +30,7 @@ interface SearchableSelectProps {
     placeholder?: string;
     className?: string;
     disabled?: boolean;
+    id?: string;
 }
 
 export function SearchableSelect({
@@ -38,7 +39,8 @@ export function SearchableSelect({
     onChange,
     placeholder = "選択してください...",
     className,
-    disabled = false
+    disabled = false,
+    id
 }: SearchableSelectProps) {
     const [open, setOpen] = React.useState(false);
 
@@ -55,6 +57,7 @@ export function SearchableSelect({
         <Popover open={open} onOpenChange={checkOpen}>
             <PopoverTrigger asChild>
                 <Button
+                    id={id}
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
