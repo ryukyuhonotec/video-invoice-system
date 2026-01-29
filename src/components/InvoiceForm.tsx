@@ -293,6 +293,10 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                 const rule = pricingRules.find(r => r.id === value);
                 // Use task duration if available, or default
                 const duration = task.duration || "0:00";
+
+                // If rule is selected, calculate price. 
+                // If rule is CLEARED (value is undefined/null), we allow manual entry, so don't reset to 0 necessarily unless desired.
+                // But typically switching rule means recalc.
                 if (rule) {
                     task.revenueAmount = calculatePrice(rule, duration, 'revenue');
                     task.costAmount = calculatePrice(rule, duration, 'cost');
@@ -402,8 +406,8 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
         try {
             const invoiceData: any = {
                 id: initialData?.id,
-                clientId: selectedClientId, // Changed clientId to selectedClientId
-                staffId: selectedStaffId, // Changed staffId to selectedStaffId
+                clientId: selectedClientId,
+                staffId: selectedStaffId || null, // Ensure empty string becomes null
                 issueDate: invoiceDate ? new Date(invoiceDate) : new Date(), // ensure Date object
                 actualDeliveryDate: actualDeliveryDate ? new Date(actualDeliveryDate) : null, // Added actualDeliveryDate
                 requestUrl: requestUrl, // Added requestUrl

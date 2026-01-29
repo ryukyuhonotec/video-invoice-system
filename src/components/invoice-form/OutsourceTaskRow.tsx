@@ -78,32 +78,18 @@ export function OutsourceTaskRow({
         updateTask(itemIndex, taskIndex, 'status', TaskStatusEnum.DELIVERED);
     };
 
-    const handlePriceFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-        if (task.pricingRuleId && !manualEditConfirmed) {
-            // Prevent recursive focus triggers if confirm returns focus to the element
-            // by temporarily disabling or checking state.
-            // Using setTimeout to allow current event to clear before confirm?
-            // Standard confirm blocks.
-            // A safer pattern for onFocus + confirm: check relatedTarget or use a flag.
-
-            // However, simply setting state on confirm should fix "loop after first ok".
-            if (!confirm("金額を手動で変更しますか？\n（通常は料金ルールに基づいて自動計算されます）")) {
-                e.target.blur();
-            } else {
-                setManualEditConfirmed(true);
-            }
-        }
-    };
+    // Removed handlePriceFocus to allow free editing. 
+    // Validation warning happens on Save.
 
     return (
-        <div className={`bg-zinc-50 p-3 border rounded-lg space-y-3 ${ruleError || partnerError ? "border-red-200 bg-red-50" : ""}`}>
+        <div className={`bg-zinc-50 dark:bg-zinc-900/50 p-3 border rounded-lg space-y-3 ${ruleError || partnerError ? "border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800" : "dark:border-zinc-800"}`}>
             {/* Row 1: Rule, Partner, Status */}
             <div className="grid grid-cols-12 gap-3 items-end">
                 {/* Pricing Rule */}
                 <div className="col-span-12 md:col-span-4 space-y-1">
-                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">料金ルール（担当領域）</Label>
+                    <Label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">料金ルール（担当領域）</Label>
                     <SearchableSelect
-                        className={`text-xs h-9 bg-white ${ruleError ? "border-red-500" : ""}`}
+                        className={`text-xs h-9 bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100 ${ruleError ? "border-red-500" : ""}`}
                         value={task.pricingRuleId || ""}
                         id={`items.${itemIndex}.outsources.${taskIndex}.pricingRuleId`}
                         onChange={(val) => updateTask(itemIndex, taskIndex, 'pricingRuleId', val)}
@@ -112,11 +98,10 @@ export function OutsourceTaskRow({
                     />
                 </div>
 
-                {/* Partner */}
                 <div className="col-span-12 md:col-span-4 space-y-1">
-                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">パートナー</Label>
+                    <Label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">パートナー</Label>
                     <SearchableSelect
-                        className="text-xs h-9 bg-white"
+                        className="text-xs h-9 bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                         value={task.partnerId || ""}
                         id={`items.${itemIndex}.outsources.${taskIndex}.partnerId`}
                         onChange={(val) => updateTask(itemIndex, taskIndex, 'partnerId', val)}
@@ -128,9 +113,9 @@ export function OutsourceTaskRow({
 
                 {/* Status */}
                 <div className="col-span-12 md:col-span-3 space-y-1">
-                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">ステータス</Label>
+                    <Label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">ステータス</Label>
                     <Select
-                        className="text-xs h-9 bg-white"
+                        className="text-xs h-9 bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                         value={task.status || TaskStatusEnum.PRE_ORDER}
                         id={`items.${itemIndex}.outsources.${taskIndex}.status`}
                         onChange={(e) => updateTask(itemIndex, taskIndex, 'status', e.target.value)}
@@ -164,12 +149,11 @@ export function OutsourceTaskRow({
 
             {/* Row 2: Date, Duration, Revenue, Cost + Delivery Button */}
             <div className="grid grid-cols-12 gap-3 items-end border-t border-zinc-200 pt-3">
-                {/* Delivery Date */}
                 <div className="col-span-6 md:col-span-3 space-y-1">
-                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">納期</Label>
+                    <Label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">納期</Label>
                     <Input
                         type="date"
-                        className="text-xs h-9 bg-white"
+                        className="text-xs h-9 bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                         value={task.deliveryDate ? (new Date(task.deliveryDate).toISOString().split('T')[0]) : ""}
                         onChange={(e) => updateTask(itemIndex, taskIndex, 'deliveryDate', e.target.value)}
                     />
@@ -177,9 +161,9 @@ export function OutsourceTaskRow({
 
                 {/* Duration */}
                 <div className="col-span-6 md:col-span-3 space-y-1">
-                    <Label className="text-[9px] font-bold text-zinc-500 uppercase">尺 (MM:SS) {isFixedPrice && <span className="text-[8px] font-normal text-zinc-400">※固定費は任意</span>}</Label>
+                    <Label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">尺 (MM:SS) {isFixedPrice && <span className="text-[8px] font-normal text-zinc-400">※固定費は任意</span>}</Label>
                     <Input
-                        className="text-xs h-9 bg-white"
+                        className="text-xs h-9 bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                         placeholder="05:00"
                         value={task.duration || ""}
                         onChange={(e) => updateTask(itemIndex, taskIndex, 'duration', e.target.value)}
@@ -199,24 +183,24 @@ export function OutsourceTaskRow({
 
                 {/* Revenue */}
                 <div className="col-span-6 md:col-span-3 space-y-1">
-                    <Label className="text-[9px] font-bold text-green-600 uppercase">請求額</Label>
+                    <Label className="text-[9px] font-bold text-green-600 dark:text-green-400 uppercase">請求額</Label>
                     <Input
-                        className="text-xs h-9 text-right font-mono bg-white border-green-200"
+                        className="text-xs h-9 text-right font-mono bg-white border-green-200 dark:bg-zinc-800 dark:border-green-900/50 dark:text-green-100"
                         type="number"
                         value={task.revenueAmount || ""}
                         onChange={(e) => updateTask(itemIndex, taskIndex, 'revenueAmount', e.target.value)}
-                        onFocus={handlePriceFocus}
+                    // onFocus removed to allow free editing
                     />
                 </div>
                 {/* Cost */}
                 <div className="col-span-6 md:col-span-3 space-y-1">
-                    <Label className="text-[9px] font-bold text-red-500 uppercase">原価</Label>
+                    <Label className="text-[9px] font-bold text-red-500 dark:text-red-400 uppercase">原価</Label>
                     <Input
-                        className="text-xs h-9 text-right font-mono bg-white border-red-100"
+                        className="text-xs h-9 text-right font-mono bg-white border-red-100 dark:bg-zinc-800 dark:border-red-900/50 dark:text-red-100"
                         type="number"
                         value={task.costAmount || ""}
                         onChange={(e) => updateTask(itemIndex, taskIndex, 'costAmount', e.target.value)}
-                        onFocus={handlePriceFocus}
+                    // onFocus removed to allow free editing
                     />
                 </div>
             </div>
@@ -228,7 +212,7 @@ export function OutsourceTaskRow({
                     <Input
                         value={task.deliveryUrl || ""}
                         onChange={(e) => updateTask(itemIndex, taskIndex, 'deliveryUrl', e.target.value)}
-                        className="h-8 text-xs bg-white"
+                        className="h-8 text-xs bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                         placeholder="URL..."
                     />
                 </div>
@@ -237,7 +221,7 @@ export function OutsourceTaskRow({
                     <Input
                         value={task.deliveryNote || ""}
                         onChange={(e) => updateTask(itemIndex, taskIndex, 'deliveryNote', e.target.value)}
-                        className="h-8 text-xs bg-white"
+                        className="h-8 text-xs bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                         placeholder="備考..."
                     />
                 </div>
