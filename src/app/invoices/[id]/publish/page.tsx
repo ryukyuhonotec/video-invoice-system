@@ -10,7 +10,7 @@ import { Download, Send, CheckCircle2, CheckCircle } from "lucide-react";
 export default function InvoicePublishPage({ params }: { params: Promise<{ id: string }> }) {
     const [invoice, setInvoice] = useState<Invoice | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [isDownloading, setIsDownloading] = useState(false);
+    // const [isDownloading, setIsDownloading] = useState(false); // No longer needed for print
     const printRef = useRef<HTMLDivElement>(null);
     // unwrapping params
     const [unwrappedParams, setUnwrappedParams] = useState<{ id: string } | null>(null);
@@ -37,51 +37,15 @@ export default function InvoicePublishPage({ params }: { params: Promise<{ id: s
         load();
     }, [unwrappedParams]);
 
-    const handleDownloadPdf = async () => {
-        if (!printRef.current || !invoice) return;
-        setIsDownloading(true);
-        try {
-            // Dynamically import html2pdf to avoid SSR issues
-            const html2pdf = (await import('html2pdf.js')).default;
-            const element = printRef.current;
-            const opt = {
-                margin: 10,
-                filename: `${isQuotation ? '見積書' : '請求書'}_${invoice.client?.name || 'unknown'}_${new Date().toISOString().split('T')[0]}.pdf`,
-                image: { type: 'jpeg' as const, quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
-            };
-            await html2pdf().set(opt).from(element).save();
-        } catch (e) {
-            console.error('PDF generation failed:', e);
-            alert('PDF生成に失敗しました');
-        } finally {
-            setIsDownloading(false);
-        }
+    const handleDownloadPdf = () => {
+        window.print();
     };
 
-    const handleIssue = async () => {
-        if (!invoice) return;
-        if (!confirm("請求書を発行しますか？\n品目のステータスが「請求済」に変更されます。")) return;
-
-        setIsLoading(true);
-        await updateInvoiceStatus(invoice.id, "Billed"); // Using internal Billed or 請求済 based on logic
-        // Reload
-        const data = await getInvoice(invoice.id);
-        setInvoice(data as any);
-        setIsLoading(false);
-    };
-
-    const handlePayment = async () => {
-        if (!invoice) return;
-        if (!confirm("入金確認を完了しますか？\n品目のステータスが「完了」に変更されます。")) return;
-
-        setIsLoading(true);
-        await updateInvoiceStatus(invoice.id, "Paid"); // Internal Paid
-        const data = await getInvoice(invoice.id);
-        setInvoice(data as any);
-        setIsLoading(false);
-    };
+    /* 
+    // Status update functions removed as per user request
+    const handleIssue = async () => { ... }
+    const handlePayment = async () => { ... }
+    */
 
     if (isLoading) return <div className="p-10 text-center">読み込み中...</div>;
     if (!invoice) return <div className="p-10 text-center">請求書が見つかりません</div>;
@@ -93,26 +57,15 @@ export default function InvoicePublishPage({ params }: { params: Promise<{ id: s
 
     // Status badges - cast to string to handle all possible status values
     const status = invoice.status as string;
-    const isBilled = status === "Billed" || status === "請求済" || status === "Paid" || status === "入金済み" || status === "完了";
-    const isPaid = status === "Paid" || status === "入金済み" || status === "完了";
+    // const isBilled = ...
+    // const isPaid = ...
 
     return (
         <div className="min-h-screen bg-zinc-100 p-8 print:p-0 print:bg-white">
             {/* Toolbar (Hidden when printing) */}
             <div className="max-w-4xl mx-auto mb-8 flex justify-between items-center print:hidden">
-                <div className="flex gap-4">
-                    {!isBilled && (
-                        <Button onClick={handleIssue} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            <Send className="w-4 h-4 mr-2" /> 請求書を発行 (ステータス更新)
-                        </Button>
-                    )}
-                    <Button onClick={handlePayment} className="bg-green-600 hover:bg-green-700 text-white">
-                        <CheckCircle className="w-4 h-4 mr-2" /> 入金確認 (完了にする)
-                    </Button>
-                    {isPaid && <div className="text-green-600 font-bold flex items-center"><CheckCircle className="mr-2" /> 支払完了 (Paid)</div>}
-                </div>
-                <Button onClick={handleDownloadPdf} disabled={isDownloading} className="bg-orange-600 hover:bg-orange-700 text-white">
-                    <Download className="w-4 h-4 mr-2" /> {isQuotation ? '見積書PDF保存' : (isDownloading ? 'ダウンロード中...' : 'PDFダウンロード')}
+                <Button onClick={handleDownloadPdf} className="bg-orange-600 hover:bg-orange-700 text-white ml-auto">
+                    <Download className="w-4 h-4 mr-2" /> {isQuotation ? '見積書 印刷/PDF保存' : '請求書 印刷/PDF保存'}
                 </Button>
             </div>
 

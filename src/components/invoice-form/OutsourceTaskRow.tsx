@@ -187,8 +187,9 @@ export function OutsourceTaskRow({
                     <Input
                         className="text-xs h-9 text-right font-mono bg-white border-green-200 dark:bg-zinc-800 dark:border-green-900/50 dark:text-green-100"
                         type="number"
+                        min={0}
                         value={task.revenueAmount || ""}
-                        onChange={(e) => updateTask(itemIndex, taskIndex, 'revenueAmount', e.target.value)}
+                        onChange={(e) => updateTask(itemIndex, taskIndex, 'revenueAmount', Math.max(0, Number(e.target.value)))}
                     // onFocus removed to allow free editing
                     />
                 </div>
@@ -198,8 +199,9 @@ export function OutsourceTaskRow({
                     <Input
                         className="text-xs h-9 text-right font-mono bg-white border-red-100 dark:bg-zinc-800 dark:border-red-900/50 dark:text-red-100"
                         type="number"
+                        min={0}
                         value={task.costAmount || ""}
-                        onChange={(e) => updateTask(itemIndex, taskIndex, 'costAmount', e.target.value)}
+                        onChange={(e) => updateTask(itemIndex, taskIndex, 'costAmount', Math.max(0, Number(e.target.value)))}
                     // onFocus removed to allow free editing
                     />
                 </div>
