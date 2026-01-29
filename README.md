@@ -13,6 +13,8 @@ Next.js (App Router) と Prisma (SQLite) を使用して構築されています
     - 各モデルの役割とリレーションの定義。
 - **[既知の課題とロードマップ (Issues)](docs/ISSUES.md)**
     - 現在の制限事項、開発時の注意点、将来の計画。
+- **[開発ガイドライン (Development Guidelines)](docs/DEVELOPMENT.md)**
+    - **必読**: コーディング規約、言語設定（日本語指定）、UI/UXルールなど。
 
 ## <span class="emoji">🚀</span> 機能概要
 
