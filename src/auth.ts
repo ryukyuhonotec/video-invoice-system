@@ -3,10 +3,36 @@ import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import prisma from "@/lib/db"
+import Credentials from "next-auth/providers/credentials"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
     adapter: PrismaAdapter(prisma),
-    providers: [Google],
+    providers: [
+        Google,
+        Credentials({
+            name: "Development Login",
+            credentials: {
+                email: { label: "Email", type: "email" }
+            },
+            async authorize(credentials) {
+                console.log("Authorize called with:", credentials);
+                // if (process.env.NODE_ENV === 'production') return null;
+
+                const email = credentials?.email as string;
+                if (!email) {
+                    console.log("No email provided");
+                    return null;
+                }
+
+                // Find user by email
+                const user = await prisma.user.findFirst({
+                    where: { email }
+                });
+                console.log("Authorize found user:", user);
+                return user;
+            }
+        })
+    ],
     // Use JWT strategy if needed, but Adapter defaults to database sessions usually. 
     // NextAuth v5 default with adapter is database strategy (if adapter is present).
     // However, for Middleware to work on Edge, we might need 'jwt' session strategy depending on setup, 
@@ -14,6 +40,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // Note: Prisma Adapter + Middleware often requires 'strategy: jwt' because Middleware runs on Edge and can't use Prisma Client directly easily.
     // But let's start simple. NextAuth v5 middleware is auth() wrapper.
     session: { strategy: "jwt" },
+    callbacks: {
+        async jwt({ token, user }) {
+            if (user) {
+                token.id = user.id
+            }
+            return token
+        },
+        async session({ session, token }) {
+            if (session.user && token.id) {
+                session.user.id = token.id as string
+            }
+            return session
+        }
+    },
     events: {
         createUser: async ({ user }) => {
             if (!user.email) return;

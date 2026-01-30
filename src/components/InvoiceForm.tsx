@@ -241,7 +241,7 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                 revenueAmount: 0,
                 costAmount: 0,
                 deliveryDate: undefined,
-                status: TaskStatusEnum.PRE_ORDER,
+                status: TaskStatusEnum.IN_PROGRESS,
                 deliveryUrl: "",
                 deliveryNote: ""
             } as Outsource];
@@ -291,15 +291,12 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
             // Auto-calculate price when rule changes
             if (field === 'pricingRuleId') {
                 const rule = pricingRules.find(r => r.id === value);
-                // Use task duration if available, or default
                 const duration = task.duration || "0:00";
+                const target = task.performanceTargetValue || 0;
 
-                // If rule is selected, calculate price. 
-                // If rule is CLEARED (value is undefined/null), we allow manual entry, so don't reset to 0 necessarily unless desired.
-                // But typically switching rule means recalc.
                 if (rule) {
-                    task.revenueAmount = calculatePrice(rule, duration, 'revenue');
-                    task.costAmount = calculatePrice(rule, duration, 'cost');
+                    task.revenueAmount = calculatePrice(rule, duration, 'revenue', target);
+                    task.costAmount = calculatePrice(rule, duration, 'cost', target);
                 }
             }
 
@@ -309,8 +306,22 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                 if (task.pricingRuleId) {
                     const rule = pricingRules.find(r => r.id === task.pricingRuleId);
                     if (rule) {
-                        task.revenueAmount = calculatePrice(rule, duration, 'revenue');
-                        task.costAmount = calculatePrice(rule, duration, 'cost');
+                        const target = task.performanceTargetValue || 0;
+                        task.revenueAmount = calculatePrice(rule, duration, 'revenue', target);
+                        task.costAmount = calculatePrice(rule, duration, 'cost', target);
+                    }
+                }
+            }
+
+            // Recalculate when performance target changes
+            if (field === 'performanceTargetValue') {
+                const target = value;
+                if (task.pricingRuleId) {
+                    const rule = pricingRules.find(r => r.id === task.pricingRuleId);
+                    if (rule) {
+                        const duration = task.duration || "0:00";
+                        task.revenueAmount = calculatePrice(rule, duration, 'revenue', target);
+                        task.costAmount = calculatePrice(rule, duration, 'cost', target);
                     }
                 }
             }
@@ -330,12 +341,14 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
 
 
     const calculateStandardPrice = (task: Outsource) => {
-        if (!task.pricingRuleId || !task.duration) return { revenue: 0, cost: 0 };
+        if (!task.pricingRuleId) return { revenue: 0, cost: 0 };
         const rule = pricingRules.find(r => r.id === task.pricingRuleId);
         if (!rule) return { revenue: 0, cost: 0 };
+        const duration = task.duration || "0:00";
+        const target = task.performanceTargetValue || 0;
         return {
-            revenue: calculatePrice(rule, task.duration, 'revenue'),
-            cost: calculatePrice(rule, task.duration, 'cost')
+            revenue: calculatePrice(rule, duration, 'revenue', target),
+            cost: calculatePrice(rule, duration, 'cost', target)
         };
     };
 
@@ -374,23 +387,32 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                 setIsSaving(false);
                 return;
             }
-        } else if (status !== InvoiceStatusEnum.DRAFT) {
+        } else if ((status as string) !== InvoiceStatusEnum.DRAFT) {
             const errors: string[] = [];
+            const warnings: string[] = [];
             if (!selectedClientId) errors.push("クライアントを選択してください"); // Changed clientId to selectedClientId
             if (!selectedStaffId) errors.push("自社担当者を選択してください"); // Changed staffId to selectedStaffId
 
             // Item validation
             items.forEach((item, index) => {
                 if (!item.name) errors.push(`項目 #${index + 1}: 項目名を入力してください`);
-                // Calculate item total from outsources
-                const itemTotal = (item.outsources || []).reduce((sum, out) => sum + out.revenueAmount, 0); // Added || []
-                const currentAmount = item.amount || 0;
-                if (Math.abs(currentAmount - itemTotal) > 1) {
-                    // errors.push(`項目 #${index + 1}: 金額(${item.amount})と内訳合計(${itemTotal})が一致しません`);
-                    // Create Warning but don't block? strictly speaking we should block for finalized invoice
-                    // For now, let's enforce consistency for non-Draft
-                }
+
+                // Check for Pricing Rule Divergence vs Manual Entry
+                (item.outsources || []).forEach((task, tIndex) => {
+                    const std = calculateStandardPrice(task);
+                    // Only warn if there IS a rule selected, and the amount differs
+                    if (task.pricingRuleId && Math.abs(task.revenueAmount - std.revenue) > 1) {
+                        warnings.push(`項目 #${index + 1} (タスク ${tIndex + 1}): 金額(¥${task.revenueAmount.toLocaleString()})が規定値(¥${std.revenue.toLocaleString()})と異なります`);
+                    }
+                });
             });
+
+            if (warnings.length > 0) {
+                if (!window.confirm("以下の設定と異なる金額が含まれていますが、保存しますか？\n\n" + warnings.join("\n"))) {
+                    setIsSaving(false);
+                    return;
+                }
+            }
 
             if (errors.length > 0) {
                 setErrorSummary(errors);
@@ -668,100 +690,97 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
             )}
 
             {/* ===== STEP 1: 案件登録 ===== */}
-            <Card className="border-l-4 border-l-blue-500 shadow-lg overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100/50 border-b">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <ClipboardList className="w-5 h-5 text-blue-600" />
-                        <span className="text-blue-800">Step 1: 案件登録</span>
-                        <span className="text-xs text-blue-500 font-normal ml-2">（受注時に入力）</span>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4 p-6">
-                    {/* Client Search Row */}
-                    <div className="grid md:grid-cols-12 gap-4 items-end" ref={clientSearchRef}>
-                        <div className="md:col-span-3 space-y-1">
-                            <Label className="text-xs text-zinc-500 dark:text-zinc-400">事業統括で絞込</Label>
-                            <Select value={selectedStaffFilter} onChange={(e) => setSelectedStaffFilter(e.target.value)} className="text-sm h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
-                                <option value="">全員</option>
-                                {operationsStaff.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                            </Select>
-                        </div>
-                        <div className="md:col-span-5 space-y-1 relative">
-                            <Label className="text-xs text-zinc-500 dark:text-zinc-400" htmlFor="clientId">クライアント検索</Label>
-                            <div className={`relative ${validationErrors['clientId'] ? 'ring-2 ring-red-500 rounded-md' : ''}`}>
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
-                                <Input
-                                    id="clientId"
-                                    value={clientSearchQuery}
-                                    onChange={(e) => { setClientSearchQuery(e.target.value); setShowClientDropdown(true); }}
-                                    onFocus={() => setShowClientDropdown(true)}
-                                    placeholder="社名で検索..."
-                                    className="pl-10 h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
-                                />
+            {!isEditing && (
+                <Card className="border-l-4 border-l-blue-500 shadow-lg overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100/50 border-b">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <ClipboardList className="w-5 h-5 text-blue-600" />
+                            <span className="text-blue-800">Step 1: 案件登録</span>
+                            <span className="text-xs text-blue-500 font-normal ml-2">（受注時に入力）</span>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 p-6">
+                        {/* Client Search Row */}
+                        <div className="grid md:grid-cols-12 gap-4 items-end" ref={clientSearchRef}>
+                            <div className="md:col-span-3 space-y-1">
+                                <Label className="text-xs text-zinc-500 dark:text-zinc-400">事業統括で絞込</Label>
+                                <Select value={selectedStaffFilter} onChange={(e) => setSelectedStaffFilter(e.target.value)} className="text-sm h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
+                                    <option value="">全員</option>
+                                    {operationsStaff.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                                </Select>
                             </div>
-                            {showClientDropdown && (
-                                <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-blue-200 rounded-lg shadow-xl dark:bg-zinc-800 dark:border-zinc-700">
-                                    {filteredClients.length === 0 ? (
-                                        <div className="p-3 text-sm text-zinc-400">該当なし</div>
-                                    ) : filteredClients.map(c => (
-                                        <button
-                                            key={c.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setSelectedClientId(c.id);
-                                                setClientSearchQuery(c.name);
-                                                setShowClientDropdown(false);
-                                                if (c.operationsLeadId) setSelectedStaffId(c.operationsLeadId);
-                                            }}
-                                            className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 dark:hover:bg-zinc-700 flex justify-between items-center ${selectedClientId === c.id ? 'bg-blue-100 dark:bg-blue-900 font-bold' : 'dark:text-zinc-100'}`}
-                                        >
-                                            <span>{c.name}</span>
-                                            {c.operationsLead && (<span className="text-xs text-blue-500"><ShieldCheck className="w-3 h-3 inline mr-1" />{c.operationsLead.name}</span>)}
-                                        </button>
-                                    ))}
+                            <div className="md:col-span-5 space-y-1 relative">
+                                <Label className="text-xs text-zinc-500 dark:text-zinc-400" htmlFor="clientId">クライアント検索</Label>
+                                <div className={`relative ${validationErrors['clientId'] ? 'ring-2 ring-red-500 rounded-md' : ''}`}>
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                                    <Input
+                                        id="clientId"
+                                        value={clientSearchQuery}
+                                        onChange={(e) => { setClientSearchQuery(e.target.value); setShowClientDropdown(true); }}
+                                        onFocus={() => setShowClientDropdown(true)}
+                                        placeholder="社名で検索..."
+                                        className="pl-10 h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
+                                    />
                                 </div>
-                            )}
-                        </div>
-                        <div className="md:col-span-4">
-                            {selectedClient ? (
-                                <div className="h-10 px-4 bg-blue-100 rounded border border-blue-300 flex items-center justify-between dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-100">
-                                    <span className="font-bold text-blue-800 dark:text-blue-100 truncate">{selectedClient.name}</span>
-                                </div>
-                            ) : (
-                                <div className="h-10 px-4 bg-zinc-100 rounded border border-dashed border-zinc-300 flex items-center text-zinc-400 text-sm dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-500">クライアント未選択</div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Date & Status Row */}
-                    <div className="grid md:grid-cols-12 gap-4">
-                        <div className="md:col-span-2 space-y-1">
-                            <Label className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> 案件開始日</Label>
-                            <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100" />
-                        </div>
-                        <div className="md:col-span-2 space-y-1">
-                            <Label className="text-xs text-zinc-500 dark:text-zinc-400">案件ステータス</Label>
-                            <Select value={invoiceStatus} onChange={(e) => setInvoiceStatus(e.target.value as InvoiceStatus)} className="h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
-                                <option value={InvoiceStatusEnum.DRAFT}>受注前 (Draft)</option>
-                                <option value={InvoiceStatusEnum.IN_PROGRESS}>進行中 (In Progress)</option>
-                                {((isEditing && initialData?.status !== InvoiceStatusEnum.DRAFT) || ([InvoiceStatusEnum.DELIVERED, InvoiceStatusEnum.BILLED, InvoiceStatusEnum.SENT, InvoiceStatusEnum.COMPLETED, InvoiceStatusEnum.LOST] as string[]).includes(invoiceStatus)) && (
-                                    <>
-                                        <option value={InvoiceStatusEnum.DELIVERED}>納品済 (Delivered)</option>
-                                        <option value={InvoiceStatusEnum.BILLED}>請求済 (Billed)</option>
-                                        <option value={InvoiceStatusEnum.SENT}>送付済 (Sent)</option>
-                                        <option value={InvoiceStatusEnum.COMPLETED}>完了 (Completed)</option>
-                                        <option value={InvoiceStatusEnum.LOST}>失注 (Lost)</option>
-                                    </>
+                                {showClientDropdown && (
+                                    <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-blue-200 rounded-lg shadow-xl dark:bg-zinc-800 dark:border-zinc-700">
+                                        {filteredClients.length === 0 ? (
+                                            <div className="p-3 text-sm text-zinc-400">該当なし</div>
+                                        ) : filteredClients.map(c => (
+                                            <button
+                                                key={c.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedClientId(c.id);
+                                                    setClientSearchQuery(c.name);
+                                                    setShowClientDropdown(false);
+                                                    if (c.operationsLeadId) setSelectedStaffId(c.operationsLeadId);
+                                                }}
+                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 dark:hover:bg-zinc-700 flex justify-between items-center ${selectedClientId === c.id ? 'bg-blue-100 dark:bg-blue-900 font-bold' : 'dark:text-zinc-100'}`}
+                                            >
+                                                <span>{c.name}</span>
+                                                {c.operationsLead && (<span className="text-xs text-blue-500"><ShieldCheck className="w-3 h-3 inline mr-1" />{c.operationsLead.name}</span>)}
+                                            </button>
+                                        ))}
+                                    </div>
                                 )}
-                            </Select>
+                            </div>
+                            <div className="md:col-span-4">
+                                {selectedClient ? (
+                                    <div className="h-10 px-4 bg-blue-100 rounded border border-blue-300 flex items-center justify-between dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-100">
+                                        <span className="font-bold text-blue-800 dark:text-blue-100 truncate">{selectedClient.name}</span>
+                                    </div>
+                                ) : (
+                                    <div className="h-10 px-4 bg-zinc-100 rounded border border-dashed border-zinc-300 flex items-center text-zinc-400 text-sm dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-500">クライアント未選択</div>
+                                )}
+                            </div>
                         </div>
-                        <div className="md:col-span-8 space-y-1">
-                            <Label className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1"><FileText className="w-3 h-3" /> 依頼チャットURL</Label>
-                            <Input value={requestUrl} onChange={(e) => setRequestUrl(e.target.value)} placeholder="https://chatwork.com/..." className="h-10 bg-white border-blue-200 text-sm dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100" />
+
+                        {/* Date & Status Row */}
+                        <div className="grid md:grid-cols-12 gap-4">
+                            <div className="md:col-span-2 space-y-1">
+                                <Label className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> 案件開始日</Label>
+                                <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100" />
+                            </div>
+                            <div className="md:col-span-2 space-y-1">
+                                <Label className="text-xs text-zinc-500 dark:text-zinc-400">案件ステータス</Label>
+                                <Select
+                                    value={invoiceStatus}
+                                    onChange={(e) => setInvoiceStatus(e.target.value as InvoiceStatus)}
+                                    className="h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
+                                >
+                                    <option value={InvoiceStatusEnum.DRAFT}>受注前</option>
+                                    <option value={InvoiceStatusEnum.IN_PROGRESS}>進行中</option>
+                                </Select>
+                            </div>
+                            <div className="md:col-span-8 space-y-1">
+                                <Label className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1"><FileText className="w-3 h-3" /> 依頼チャットURL</Label>
+                                <Input value={requestUrl} onChange={(e) => setRequestUrl(e.target.value)} placeholder="https://chatwork.com/..." className="h-10 bg-white border-blue-200 text-sm dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100" />
+                            </div>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            )}
 
 
 
@@ -790,6 +809,7 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                             availableRules={availableRules}
                             canDeleteItem={items.length > 1}
                             errors={validationErrors}
+                            hideTasks={invoiceStatus === InvoiceStatusEnum.DRAFT}
                         />
                     ))}
                 </div>
@@ -879,7 +899,7 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                     </CardFooter>
                 </Card>
             </div>
-        </div >
+        </div>
     );
 }
 

@@ -55,6 +55,7 @@ function PartnersPageContent() {
     const [newRoleName, setNewRoleName] = useState("");
     const [isAddingRole, setIsAddingRole] = useState(false);
     const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
+    const [roleDeleteCount, setRoleDeleteCount] = useState<number>(0);
 
     const searchParams = useSearchParams();
 
@@ -96,11 +97,6 @@ function PartnersPageContent() {
 
     useEffect(() => {
         fetchPartners();
-        // Handle edit param logic is moved to check after fetch or separate effect?
-        // Ideally we handle 'edit' param by fetching that specific partner if not in list.
-        // But for simplicity, we ignore deep linking to edit page if not on first page for now, 
-        // OR we just remove the auto-edit from URL feature if it complicates pagination.
-        // Given 'edit' param logic was simple, let's keep it but it might fail if partner is on page 2.
     }, [currentPage, debouncedSearch, selectedRoleFilter, showArchived]);
 
     // Check URL edit param once on mount (or when partners loaded)
@@ -170,6 +166,13 @@ function PartnersPageContent() {
             e.preventDefault();
             e.stopPropagation();
         }
+        const role = roles.find(r => r.id === id);
+        if (role) {
+            const count = partners.filter(p => (p.role || "").split(',').map(r => r.trim()).includes(role.name)).length;
+            setRoleDeleteCount(count);
+        } else {
+            setRoleDeleteCount(0);
+        }
         setRoleToDelete(id);
     };
 
@@ -180,6 +183,8 @@ function PartnersPageContent() {
         if (res?.success) {
             const rData = await getPartnerRoles();
             setRoles(rData as any);
+            // Refresh partners list as some might have had roles removed
+            await fetchPartners();
         } else {
             alert("役割の削除に失敗しました");
         }
@@ -314,7 +319,7 @@ function PartnersPageContent() {
                                         placeholder="新しい役割名"
                                         className="h-8 text-sm dark:bg-zinc-800"
                                     />
-                                    <Button size="sm" variant="outline" onClick={handleAddRole} disabled={!newRoleName || isAddingRole} className="h-8">
+                                    <Button size="sm" type="button" variant="outline" onClick={handleAddRole} disabled={!newRoleName || isAddingRole} className="h-8">
                                         <Plus className="w-3 h-3 mr-1" /> 追加
                                     </Button>
                                 </div>
@@ -610,7 +615,15 @@ function PartnersPageContent() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>役割の削除</AlertDialogTitle>
                         <AlertDialogDescription>
-                            この役割を削除してもよろしいですか？この操作は取り消せません。
+                            {roleDeleteCount > 0 ? (
+                                <span className="text-red-600 font-bold block">
+                                    この役割は現在 {roleDeleteCount} 名のパートナーに割り当てられています。<br />
+                                    削除すると、これらのパートナーから役割が解除されます。<br />
+                                    本当に削除してもよろしいですか？
+                                </span>
+                            ) : (
+                                "この役割を削除してもよろしいですか？この操作は取り消せません。"
+                            )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

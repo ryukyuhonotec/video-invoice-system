@@ -220,19 +220,19 @@ export default function PricingRulesPage() {
                             <div className="space-y-2">
                                 <Label className="font-bold dark:text-zinc-200">料金タイプ</Label>
                                 <Select value={editingRule.type} onChange={e => setEditingRule({ ...editingRule, type: e.target.value as PricingType })}>
-                                    <option value="FIXED">固定料金 (Fixed)</option>
-                                    <option value="STEPPED">階段式 (Stepped)</option>
-                                    <option value="LINEAR">従量課金 (Linear)</option>
+                                    <option value="FIXED">固定料金</option>
+                                    <option value="STEPPED">階段式</option>
+                                    <option value="PERFORMANCE">成果報酬</option>
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label className="font-bold dark:text-zinc-200">適用範囲 (Scope)</Label>
+                                <Label className="font-bold dark:text-zinc-200">適用範囲</Label>
                                 <Select
                                     value={scope}
                                     onChange={e => setScope(e.target.value as "GENERIC" | "INDIVIDUAL")}
                                 >
-                                    <option value="GENERIC">汎用ルール (全案件・全パートナー)</option>
-                                    <option value="INDIVIDUAL">個別指定 (特定のクライアント/パートナー)</option>
+                                    <option value="GENERIC">汎用ルール（全案件・全パートナー）</option>
+                                    <option value="INDIVIDUAL">個別指定（特定のクライアント/パートナー）</option>
                                 </Select>
                             </div>
                         </div>
@@ -311,6 +311,13 @@ export default function PricingRulesPage() {
                                             </div>
                                         </div>
                                     )}
+                                    {editingRule.type === 'PERFORMANCE' && (
+                                        <div className="space-y-2">
+                                            <Label className="dark:text-zinc-200">売上還元率 (%)</Label>
+                                            <Input type="number" className="dark:bg-zinc-800 dark:text-zinc-100" value={editingRule.percentage || 0} onChange={e => setEditingRule({ ...editingRule, percentage: parseFloat(e.target.value) })} />
+                                            <p className="text-[10px] text-zinc-500">※ 入力された成果対象額に対してこの％を乗じた金額が請求額になります</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -376,10 +383,15 @@ export default function PricingRulesPage() {
                                             </div>
                                         </div>
                                     )}
+                                    {editingRule.type === 'PERFORMANCE' && (
+                                        <div className="space-y-2">
+                                            <Label className="dark:text-zinc-200">原価還元率 (%)</Label>
+                                            <Input type="number" className="dark:bg-zinc-800 dark:text-zinc-100" value={editingRule.costPercentage || 0} onChange={e => setEditingRule({ ...editingRule, costPercentage: parseFloat(e.target.value) })} />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
-
 
                         <div className="flex justify-end gap-2 border-t pt-4">
                             <Button variant="ghost" onClick={() => setIsEditing(false)}>キャンセル</Button>
@@ -389,7 +401,8 @@ export default function PricingRulesPage() {
                         </div>
                     </CardContent>
                 </Card>
-            )}
+            )
+            }
 
             <Card className="shadow-md dark:bg-zinc-900 dark:border-zinc-800">
                 <CardHeader className="bg-zinc-50 dark:bg-zinc-800 border-b dark:border-zinc-700">
@@ -465,6 +478,7 @@ export default function PricingRulesPage() {
                                             <td className="p-4 text-xs">
                                                 {rule.type === 'FIXED' && <span className="text-zinc-600 dark:text-zinc-400">固定</span>}
                                                 {rule.type === 'STEPPED' && <span className="text-zinc-600 dark:text-zinc-400">階段</span>}
+                                                {rule.type === 'PERFORMANCE' && <span className="text-purple-600 dark:text-purple-400 font-bold">成果</span>}
                                                 {rule.type === 'LINEAR' && <span className="text-zinc-600 dark:text-zinc-400">従量</span>}
                                             </td>
                                             <td className="p-4">
@@ -478,6 +492,7 @@ export default function PricingRulesPage() {
                                             <td className="p-4 text-xs font-mono dark:text-zinc-300">
                                                 {rule.type === 'FIXED' && <div>売: ¥{rule.fixedPrice?.toLocaleString()} / 原: ¥{rule.fixedCost?.toLocaleString()}</div>}
                                                 {rule.type === 'STEPPED' && <div>階段設定あり</div>}
+                                                {rule.type === 'PERFORMANCE' && <div>{rule.percentage}% / {rule.costPercentage}%</div>}
                                                 {rule.type === 'LINEAR' && <div>¥{rule.incrementalUnitPrice?.toLocaleString()} / {rule.incrementalUnit}分</div>}
                                             </td>
                                             <td className="p-4 text-right" onClick={e => e.stopPropagation()}>
@@ -506,6 +521,6 @@ export default function PricingRulesPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </div >
     );
 }

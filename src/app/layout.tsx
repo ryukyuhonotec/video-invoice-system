@@ -20,6 +20,8 @@ export const metadata: Metadata = {
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 
+import { Providers } from "@/components/providers";
+
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import pkg from "../../package.json";
@@ -34,23 +36,25 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-50 dark:bg-zinc-950`}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <div className="flex min-h-screen">
-            <Sidebar version={pkg.version} />
-            <main className="flex-1 ml-64 flex flex-col">
-              <Header />
-              <div className="flex-1">
-                {children}
-              </div>
-            </main>
-          </div>
-          <Toaster />
-        </ThemeProvider>
+        <Providers>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <div className="flex min-h-screen">
+              <Sidebar version={pkg.version} />
+              <main className="flex-1 ml-64 flex flex-col">
+                <Header />
+                <div className="flex-1">
+                  {children}
+                </div>
+              </main>
+            </div>
+            <Toaster />
+          </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );

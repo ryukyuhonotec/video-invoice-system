@@ -1,4 +1,4 @@
-export type PricingType = 'FIXED' | 'STEPPED' | 'LINEAR';
+export type PricingType = 'FIXED' | 'STEPPED' | 'LINEAR' | 'PERFORMANCE';
 
 export interface PricingStep {
     upTo: number; // Duration in minutes
@@ -24,6 +24,10 @@ export interface PricingRule {
     incrementalCostUnit?: number;
     incrementalCostPrice?: number;
     incrementalCostThreshold?: number;
+
+    // Performance (NEW)
+    percentage?: number; // Revenue %
+    costPercentage?: number; // Cost %
 
     clients?: Client[];
     partners?: Partner[];
@@ -100,6 +104,7 @@ export interface Outsource {
     // 納期
     deliveryDate?: string;
     duration?: string; // 尺 (mm:ss)
+    performanceTargetValue?: number; // 成果対象額 (売上/広告消化額)
 
     // ステータス
     status: string; // 受注前, 制作中, 確認中, 納品済, 請求済, 入金済み

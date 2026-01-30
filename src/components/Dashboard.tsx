@@ -49,6 +49,20 @@ export default function Dashboard({
             inv.items.forEach(item => {
                 (item.outsources || []).forEach(task => {
                     const partner = initialPartners.find(p => p.id === task.partnerId);
+
+                    const statusMap: Record<string, string> = {
+                        "DRAFT": "受注前",
+                        "IN_PROGRESS": "制作中",
+                        "PENDING": "確認中",
+                        "DELIVERED": "納品済",
+                        "BILLED": "請求済",
+                        "PAID": "入金済み",
+                        "SENT": "送付済",
+                        "COMPLETED": "完了",
+                        "LOST": "失注"
+                    };
+                    const statusLabel = statusMap[task.status] || task.status || item.productionStatus || "受注前";
+
                     tasks.push({
                         id: task.id,
                         invoiceId: inv.id,
@@ -68,7 +82,7 @@ export default function Dashboard({
                         accountantName: accountant?.name || "-",
                         accountantId: client?.accountantId,
                         deliveryDate: task.deliveryDate,
-                        status: task.status || item.productionStatus || "受注前",
+                        status: statusLabel,
                         revenueAmount: task.revenueAmount || 0,
                         costAmount: task.costAmount || 0,
                         duration: item.duration,
@@ -157,10 +171,14 @@ export default function Dashboard({
     const getStatusBadge = (status: string) => {
         switch (status) {
             case "受注前": return "bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600";
-            case "制作中": return "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700";
+            case "制作中":
+            case "進行中": return "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700";
             case "確認中": return "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-700";
             case "納品済": return "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700";
             case "請求済": return "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/40 dark:text-green-300 dark:border-green-700";
+            case "送付済": return "bg-cyan-100 text-cyan-700 border-cyan-300 dark:bg-cyan-900/40 dark:text-cyan-300 dark:border-cyan-700";
+            case "完了": return "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/40 dark:text-gray-300 dark:border-gray-700";
+            case "失注": return "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700";
             case "入金済み": return "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700";
             default: return "bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600";
         }
@@ -248,7 +266,7 @@ export default function Dashboard({
                 <CardContent className="p-0">
                     <div className="relative w-full overflow-auto">
                         <table className="w-full caption-bottom text-sm text-left dark:text-zinc-300">
-                            <thead className="bg-zinc-800 text-white border-b dark:border-zinc-700">
+                            <thead className="bg-zinc-800 text-white border-b dark:border-zinc-700 sticky top-0 z-20 shadow-sm">
                                 <tr>
                                     <th className="h-12 px-4 align-middle font-bold w-[80px]">納期</th>
                                     <th className="h-12 px-4 align-middle font-bold">品目名</th>

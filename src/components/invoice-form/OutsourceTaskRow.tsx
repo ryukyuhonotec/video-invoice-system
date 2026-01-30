@@ -62,12 +62,14 @@ export function OutsourceTaskRow({
 
     // Delivery Button Logic
     const isFixedPrice = selectedRule?.type === 'FIXED';
+    const isPerformance = selectedRule?.type === 'PERFORMANCE';
     const hasDeliveryUrl = !!task.deliveryUrl && task.deliveryUrl.length > 0;
     const hasDeliveryDate = !!task.deliveryDate;
     const hasDuration = !!task.duration && task.duration.length > 0;
+    const hasTargetValue = (task.performanceTargetValue || 0) > 0;
 
-    // Condition: URL & Date required. Duration required only if NOT fixed price.
-    const canDeliver = hasDeliveryUrl && hasDeliveryDate && (isFixedPrice || hasDuration);
+    // Condition: URL & Date required. Duration required only if NOT fixed and NOT performance. Target required if Performance.
+    const canDeliver = hasDeliveryUrl && hasDeliveryDate && (isFixedPrice || (isPerformance ? hasTargetValue : hasDuration));
     const isDelivered = task.status === TaskStatusEnum.DELIVERED;
 
     const [manualEditConfirmed, setManualEditConfirmed] = useState(false);
@@ -116,17 +118,16 @@ export function OutsourceTaskRow({
                     <Label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">ステータス</Label>
                     <Select
                         className="text-xs h-9 bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
-                        value={task.status || TaskStatusEnum.PRE_ORDER}
+                        value={task.status || TaskStatusEnum.IN_PROGRESS}
                         id={`items.${itemIndex}.outsources.${taskIndex}.status`}
                         onChange={(e) => updateTask(itemIndex, taskIndex, 'status', e.target.value)}
                     >
-                        <option value={TaskStatusEnum.PRE_ORDER}>{TaskStatusEnum.PRE_ORDER}</option>
-                        <option value={TaskStatusEnum.IN_PROGRESS}>{TaskStatusEnum.IN_PROGRESS}</option>
-                        <option value={TaskStatusEnum.CORRECTION}>{TaskStatusEnum.CORRECTION}</option>
-                        <option value={TaskStatusEnum.REVIEW}>{TaskStatusEnum.REVIEW}</option>
+                        <option value={TaskStatusEnum.IN_PROGRESS}>進行中</option>
+                        <option value={TaskStatusEnum.CORRECTION}>修正中</option>
+                        <option value={TaskStatusEnum.REVIEW}>確認中</option>
                         {/* Only show DELIVERED if it IS the current status (cannot select manually) */}
                         {task.status === TaskStatusEnum.DELIVERED && (
-                            <option value={TaskStatusEnum.DELIVERED}>{TaskStatusEnum.DELIVERED}</option>
+                            <option value={TaskStatusEnum.DELIVERED}>納品済</option>
                         )}
                     </Select>
                 </div>
@@ -147,7 +148,7 @@ export function OutsourceTaskRow({
                 )}
             </div>
 
-            {/* Row 2: Date, Duration, Revenue, Cost + Delivery Button */}
+            {/* Row 2: Date, Duration/Target, Revenue, Cost + Delivery Button */}
             <div className="grid grid-cols-12 gap-3 items-end border-t border-zinc-200 pt-3">
                 <div className="col-span-6 md:col-span-3 space-y-1">
                     <Label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">納期</Label>
@@ -159,23 +160,44 @@ export function OutsourceTaskRow({
                     />
                 </div>
 
-                {/* Duration */}
+                {/* Duration or Performance Target */}
                 <div className="col-span-6 md:col-span-3 space-y-1">
-                    <Label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">尺 (MM:SS) {isFixedPrice && <span className="text-[8px] font-normal text-zinc-400">※固定費は任意</span>}</Label>
-                    <Input
-                        className="text-xs h-9 bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
-                        placeholder="05:00"
-                        value={task.duration || ""}
-                        onChange={(e) => updateTask(itemIndex, taskIndex, 'duration', e.target.value)}
-                        onBlur={(e) => {
-                            const val = e.target.value;
-                            const normalized = val.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-                                .replace(/：/g, ':');
-                            if (val !== normalized) {
-                                updateTask(itemIndex, taskIndex, 'duration', normalized);
-                            }
-                        }}
-                    />
+                    {isPerformance ? (
+                        <>
+                            <Label className="text-[9px] font-bold text-purple-600 dark:text-purple-400 uppercase">成果対象額 (売上/消化)</Label>
+                            <Input
+                                type="number"
+                                min={0}
+                                className="text-xs h-9 bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
+                                placeholder="金額を入力..."
+                                value={task.performanceTargetValue || ""}
+                                onChange={(e) => updateTask(itemIndex, taskIndex, 'performanceTargetValue', Math.max(0, parseInt(e.target.value) || 0))}
+                            />
+                        </>
+                    ) : isFixedPrice ? (
+                        // Fixed Price: Show Disabled/Hidden or just Label indicating fixed?
+                        // User says "Fixed -> Duration not needed".
+                        // We can leave it empty or show a placeholder.
+                        null
+                    ) : (
+                        <>
+                            <Label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">尺 (MM:SS)</Label>
+                            <Input
+                                className="text-xs h-9 bg-white dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
+                                placeholder="05:00"
+                                value={task.duration || ""}
+                                onChange={(e) => updateTask(itemIndex, taskIndex, 'duration', e.target.value)}
+                                onBlur={(e) => {
+                                    const val = e.target.value;
+                                    const normalized = val.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                                        .replace(/：/g, ':');
+                                    if (val !== normalized) {
+                                        updateTask(itemIndex, taskIndex, 'duration', normalized);
+                                    }
+                                }}
+                            />
+                        </>
+                    )}
                 </div>
 
                 {/* Delivery Info (Moved from Row 3 to here for compact layout if space allows, or keep in separate row? User requested: "Put URL and Date and Duration -> Button") */}

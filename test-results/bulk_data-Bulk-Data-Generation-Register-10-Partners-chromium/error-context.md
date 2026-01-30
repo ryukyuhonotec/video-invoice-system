@@ -1,0 +1,150 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - heading "VIDEO INVOICE" [level=1] [ref=e5]
+        - paragraph [ref=e6]: 制作進行管理システム
+      - navigation [ref=e7]:
+        - link "進行管理" [ref=e8] [cursor=pointer]:
+          - /url: /
+          - img [ref=e9]
+          - text: 進行管理
+        - link "事業統括・経理" [ref=e14] [cursor=pointer]:
+          - /url: /staff
+          - img [ref=e15]
+          - text: 事業統括・経理
+        - link "クライアント" [ref=e18] [cursor=pointer]:
+          - /url: /clients
+          - img [ref=e19]
+          - text: クライアント
+        - link "パートナー" [ref=e22] [cursor=pointer]:
+          - /url: /partners
+          - img [ref=e23]
+          - text: パートナー
+        - link "請求管理" [ref=e28] [cursor=pointer]:
+          - /url: /bills
+          - img [ref=e29]
+          - text: 請求管理
+        - link "料金ルール" [ref=e32] [cursor=pointer]:
+          - /url: /pricing-rules
+          - img [ref=e33]
+          - text: 料金ルール
+        - link "売上分析" [ref=e36] [cursor=pointer]:
+          - /url: /analytics
+          - img [ref=e37]
+          - text: 売上分析
+        - link "使い方FAQ" [ref=e40] [cursor=pointer]:
+          - /url: /faq
+          - img [ref=e41]
+          - text: 使い方FAQ
+        - link "設定" [ref=e44] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e45]
+          - text: 設定
+      - generic [ref=e49]: v0.2.0 © Honotec Movie
+    - main [ref=e50]:
+      - button "小野翔悟 小野翔悟 s.o.02.0999@gmail.com" [ref=e53]:
+        - generic [ref=e54]:
+          - img "小野翔悟" [ref=e56]
+          - generic [ref=e57]:
+            - paragraph [ref=e58]: 小野翔悟
+            - paragraph [ref=e59]: s.o.02.0999@gmail.com
+      - generic [ref=e61]:
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - heading "パートナー管理" [level=1] [ref=e64]
+            - paragraph [ref=e65]: 制作スタッフ（カメラマン、エディター等）の管理を行います。
+          - button "パートナー登録" [ref=e66]:
+            - img
+            - text: パートナー登録
+        - generic [ref=e67]:
+          - heading "新規パートナー登録" [level=3] [ref=e69]
+          - generic [ref=e70]:
+            - generic [ref=e71]:
+              - generic [ref=e72]:
+                - text: 氏名
+                - textbox "山田 太郎" [ref=e73]: Auto Partner 1
+              - generic [ref=e74]:
+                - text: 役割（複数選択可）
+                - generic [ref=e76]:
+                  - textbox "新しい役割名" [ref=e77]
+                  - button "追加" [disabled]:
+                    - img
+                    - text: 追加
+              - generic [ref=e78]:
+                - text: メールアドレス
+                - textbox "example@email.com" [active] [ref=e79]: partner1@example.com
+              - generic [ref=e80]:
+                - text: Chatwork グループURL
+                - textbox "https://www.chatwork.com/g/..." [ref=e81]
+              - generic [ref=e82]:
+                - text: 担当クライアント
+                - combobox [ref=e83]:
+                  - generic [ref=e85]: クライアントを選択...
+                  - img
+              - generic [ref=e86]:
+                - text: アーカイブ設定
+                - generic [ref=e87]:
+                  - checkbox "このパートナーをアーカイブする（一覧に表示しない）" [ref=e88]
+                  - generic [ref=e89] [cursor=pointer]: このパートナーをアーカイブする（一覧に表示しない）
+              - generic [ref=e90]:
+                - text: 契約状況
+                - generic [ref=e91]:
+                  - checkbox "契約締結済み" [ref=e92]
+                  - generic [ref=e93] [cursor=pointer]: 契約締結済み
+              - generic [ref=e94]:
+                - text: 備考
+                - textbox "備考情報..." [ref=e95]
+            - generic [ref=e96]:
+              - button "キャンセル" [ref=e97]
+              - button "保存" [ref=e98]
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - img [ref=e101]
+            - textbox "パートナー名で検索..." [ref=e104]
+          - generic [ref=e106]:
+            - combobox [ref=e107]:
+              - option "役割：すべて" [selected]
+              - option "運用者"
+            - generic: ▼
+          - generic [ref=e108]:
+            - checkbox "アーカイブ済みを表示" [ref=e109]
+            - generic [ref=e110] [cursor=pointer]: アーカイブ済みを表示
+        - generic [ref=e111]:
+          - heading "パートナー一覧 全 1 件" [level=3] [ref=e113]:
+            - generic [ref=e114]: パートナー一覧
+            - generic [ref=e115]: 全 1 件
+          - generic [ref=e116]:
+            - table [ref=e118]:
+              - rowgroup [ref=e119]:
+                - row "氏名 役割 連絡先 担当クライアント 原価ルール" [ref=e120]:
+                  - columnheader "氏名" [ref=e121]
+                  - columnheader "役割" [ref=e122]
+                  - columnheader "連絡先" [ref=e123]
+                  - columnheader "担当クライアント" [ref=e124]
+                  - columnheader "原価ルール" [ref=e125]
+              - rowgroup [ref=e126]:
+                - row "Manual Test Partner 1 運用者 - - -" [ref=e127] [cursor=pointer]:
+                  - cell "Manual Test Partner 1" [ref=e128]:
+                    - generic [ref=e130]: Manual Test Partner 1
+                  - cell "運用者" [ref=e131]:
+                    - generic [ref=e132]: 運用者
+                  - cell "-" [ref=e133]
+                  - cell "-" [ref=e134]
+                  - cell "-" [ref=e135]
+            - generic [ref=e136]:
+              - generic [ref=e137]: 1 件中 1 - 1 件を表示
+              - generic [ref=e138]:
+                - button [disabled]:
+                  - img
+                - generic [ref=e139]: Page 1 / 1
+                - button [disabled]:
+                  - img
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e145] [cursor=pointer]:
+    - img [ref=e146]
+  - alert [ref=e149]
+```

@@ -145,6 +145,10 @@ model PricingRule {
   incrementalCostPrice     Float?  // NEW: 原価単価
   incrementalCostThreshold Float?  // NEW: 原価閾値
   
+  // Performance Type Fields
+  percentage               Float?  // NEW: 売上還元率 (%)
+  costPercentage           Float?  // NEW: 原価還元率 (%)
+  
   // Relations - M:N
   clients     Client[]  @relation("ClientPricingRules")
   partners    Partner[] @relation("PartnerCostRules")

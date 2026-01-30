@@ -39,6 +39,29 @@ export default function LoginPage() {
                         Googleでログイン
                     </Button>
                 </form>
+
+                {process.env.NODE_ENV !== 'production' && (
+                    <div className="mt-8 pt-8 border-t">
+                        <p className="text-xs text-center text-zinc-500 mb-4">開発用ログイン (Dev Only)</p>
+                        <form
+                            action={async (formData) => {
+                                "use server"
+                                await signIn("credentials", formData, { redirectTo: "/" })
+                            }}
+                        >
+                            <input
+                                type="email"
+                                name="email"
+                                defaultValue="s.o.02.0999@gmail.com"
+                                className="w-full mb-2 p-2 text-sm border rounded bg-zinc-50"
+                                placeholder="Email"
+                            />
+                            <Button className="w-full text-zinc-500" variant="outline" size="sm">
+                                Development Login
+                            </Button>
+                        </form>
+                    </div>
+                )}
             </div>
         </div>
     )

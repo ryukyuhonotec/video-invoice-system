@@ -19,11 +19,19 @@ export function parseDuration(durationStr: string | number | undefined): number 
     return isNaN(num) ? 0 : num;
 }
 
-export function calculatePrice(rule: PricingRule, durationInput: number | string, side: 'revenue' | 'cost' = 'revenue'): number {
+export function calculatePrice(rule: PricingRule, durationInput: number | string, side: 'revenue' | 'cost' = 'revenue', targetValue: number = 0): number {
     const durationInMinutes = parseDuration(durationInput);
 
     if (rule.type === 'FIXED') {
-        return (side === 'revenue' ? rule.fixedPrice : rule.fixedCost) || 0;
+        const val = (side === 'revenue' ? rule.fixedPrice : rule.fixedCost) || 0;
+        return Math.max(0, val);
+    }
+
+    if (rule.type === 'PERFORMANCE') {
+        const pct = (side === 'revenue' ? rule.percentage : rule.costPercentage) || 0;
+        // Calculate raw amount: target * (percentage / 100)
+        // Usually truncate decimal for JPY
+        return Math.max(0, Math.floor(targetValue * (pct / 100)));
     }
 
     // Handle STEPPED / LINEAR
@@ -47,7 +55,7 @@ export function calculatePrice(rule: PricingRule, durationInput: number | string
         const matchedStep = sortedSteps.find(step => durationInMinutes <= step.upTo);
 
         if (matchedStep) {
-            return matchedStep.price;
+            return Math.max(0, matchedStep.price); // Found exact step
         } else {
             const lastStep = sortedSteps[sortedSteps.length - 1];
             price = lastStep.price;
@@ -69,10 +77,10 @@ export function calculatePrice(rule: PricingRule, durationInput: number | string
         price += unitsToAdd * unitPrice;
     }
 
-    return price;
+    return Math.max(0, price);
 }
 
-export function calculatePartnerCost(partner: Partner, clientId: string | undefined, durationInput: number | string): number {
+export function calculatePartnerCost(partner: Partner, clientId: string | undefined, durationInput: number | string, targetValue: number = 0): number {
     const durationInMinutes = parseDuration(durationInput);
     if (!partner.pricingRules || partner.pricingRules.length === 0) return 0;
 
@@ -80,5 +88,5 @@ export function calculatePartnerCost(partner: Partner, clientId: string | undefi
     if (!rule) rule = partner.pricingRules.find(r => !r.clients || r.clients.length === 0);
     if (!rule) return 0;
 
-    return calculatePrice(rule, durationInMinutes, 'cost');
+    return calculatePrice(rule, durationInMinutes, 'cost', targetValue);
 }

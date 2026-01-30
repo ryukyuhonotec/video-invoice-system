@@ -19,6 +19,7 @@ interface InvoiceItemRowProps {
     availableRules: PricingRule[];
     canDeleteItem: boolean;
     errors?: { [key: string]: string };
+    hideTasks?: boolean;
 }
 
 export function InvoiceItemRow({
@@ -33,7 +34,8 @@ export function InvoiceItemRow({
     partners,
     availableRules,
     canDeleteItem,
-    errors
+    errors,
+    hideTasks
 }: InvoiceItemRowProps) {
     const nameError = errors?.[`items.${itemIndex}.name`];
 
@@ -53,9 +55,19 @@ export function InvoiceItemRow({
                 </div>
                 <div className="col-span-4 md:col-span-3 space-y-1 text-right">
                     <Label className="text-[10px] text-green-400 uppercase font-bold tracking-wider">合計請求</Label>
-                    <div className="flex h-9 w-full rounded-md border border-zinc-600 bg-zinc-900 px-3 items-center justify-end font-mono text-green-400 font-bold text-sm">
-                        ¥{item.amount?.toLocaleString() || 0}
-                    </div>
+                    {hideTasks ? (
+                        <Input
+                            type="number"
+                            min={0}
+                            value={item.amount || 0}
+                            onChange={(e) => updateItem(itemIndex, 'amount', Math.max(0, parseInt(e.target.value) || 0))}
+                            className="h-9 w-full bg-zinc-900 border-zinc-600 text-green-400 font-bold text-right font-mono"
+                        />
+                    ) : (
+                        <div className="flex h-9 w-full rounded-md border border-zinc-600 bg-zinc-900 px-3 items-center justify-end font-mono text-green-400 font-bold text-sm">
+                            ¥{item.amount?.toLocaleString() || 0}
+                        </div>
+                    )}
                 </div>
                 <div className="col-span-2 md:col-span-1 flex justify-end">
                     <Button
@@ -72,38 +84,40 @@ export function InvoiceItemRow({
             </div>
 
             {/* Tasks (Outsources) */}
-            <CardContent className="bg-white p-4 space-y-3">
-                <div className="flex items-center justify-between border-b pb-2">
-                    <Label className="text-xs font-bold text-zinc-700 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-blue-500" /> タスク（担当領域）
-                    </Label>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-[10px] h-7 px-3 border-blue-200 text-blue-600 hover:bg-blue-50"
-                        onClick={() => handleAddTask(itemIndex)}
-                        type="button"
-                    >
-                        <PlusCircle className="w-3 h-3 mr-1" /> タスク追加
-                    </Button>
-                </div>
+            {!hideTasks && (
+                <CardContent className="bg-white p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                        <Label className="text-xs font-bold text-zinc-700 flex items-center gap-2">
+                            <Users className="w-4 h-4 text-blue-500" /> タスク（担当領域）
+                        </Label>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-[10px] h-7 px-3 border-blue-200 text-blue-600 hover:bg-blue-50"
+                            onClick={() => handleAddTask(itemIndex)}
+                            type="button"
+                        >
+                            <PlusCircle className="w-3 h-3 mr-1" /> タスク追加
+                        </Button>
+                    </div>
 
-                {(item.outsources || []).map((task, taskIndex) => (
-                    <OutsourceTaskRow
-                        key={task.id}
-                        task={task}
-                        itemIndex={itemIndex}
-                        taskIndex={taskIndex}
-                        pricingRules={pricingRules}
-                        partners={partners}
-                        updateTask={updateTask}
-                        handleRemoveTask={handleRemoveTask}
-                        availableRules={availableRules}
-                        canDelete={(item.outsources?.length || 0) > 1}
-                        errors={errors}
-                    />
-                ))}
-            </CardContent>
+                    {(item.outsources || []).map((task, taskIndex) => (
+                        <OutsourceTaskRow
+                            key={task.id}
+                            task={task}
+                            itemIndex={itemIndex}
+                            taskIndex={taskIndex}
+                            pricingRules={pricingRules}
+                            partners={partners}
+                            updateTask={updateTask}
+                            handleRemoveTask={handleRemoveTask}
+                            availableRules={availableRules}
+                            canDelete={(item.outsources?.length || 0) > 1}
+                            errors={errors}
+                        />
+                    ))}
+                </CardContent>
+            )}
         </Card>
     );
 }

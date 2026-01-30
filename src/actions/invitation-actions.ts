@@ -101,8 +101,17 @@ export async function useInvitation(token: string, userId: string, userData: { n
         }
 
         // Create staff record
-        const staff = await prisma.staff.create({
-            data: {
+        // key matching: id is PK, but userId is unique?
+        // We know userId is unique from the error.
+        // But upsert 'where' needs a unique field.
+        const staff = await prisma.staff.upsert({
+            where: { userId: userId },
+            update: {
+                name: userData.name,
+                email: userData.email,
+                role: invitation.staffRole,
+            },
+            create: {
                 name: userData.name,
                 email: userData.email,
                 role: invitation.staffRole,

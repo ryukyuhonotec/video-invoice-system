@@ -35,7 +35,43 @@ export async function addPartnerRole(name: string) {
 
 export async function deletePartnerRole(id: string) {
     try {
+        // 1. Get the role name before deleting
+        const roleToDelete = await prisma.partnerRole.findUnique({
+            where: { id }
+        });
+
+        if (!roleToDelete) {
+            return { success: false, error: "Role not found" };
+        }
+
+        // 2. Find partners who have this role
+        // Since roles are stored as "Role A, Role B", we use contains
+        // We will do precise filtering in JS to avoid partial matches (e.g. "Editor" vs "Chief Editor")
+        const potentiallyAffectedPartners = await prisma.partner.findMany({
+            where: {
+                role: { contains: roleToDelete.name }
+            }
+        });
+
+        // 3. Update each partner to remove the role
+        for (const partner of potentiallyAffectedPartners) {
+            if (!partner.role) continue;
+
+            const currentRoles = partner.role.split(',').map(r => r.trim());
+
+            // Only update if the exact role exists
+            if (currentRoles.includes(roleToDelete.name)) {
+                const newRoles = currentRoles.filter(r => r !== roleToDelete.name).join(',');
+                await prisma.partner.update({
+                    where: { id: partner.id },
+                    data: { role: newRoles }
+                });
+            }
+        }
+
+        // 4. Delete the role
         await prisma.partnerRole.delete({ where: { id } });
+
         revalidatePath("/partners");
         return { success: true };
     } catch (e) {
