@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
 import { createClient } from "@libsql/client";
 
 const prismaClientSingleton = () => {
@@ -13,7 +13,7 @@ const prismaClientSingleton = () => {
             url,
             authToken,
         });
-        const adapter = new PrismaLibSql(libsql as any);
+        const adapter = new PrismaLibSQL(libsql as any);
         // Cast to 'any' or specific options type if adapter is not in default types yet
         return new PrismaClient({ adapter } as any);
     }
