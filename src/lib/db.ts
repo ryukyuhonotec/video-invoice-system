@@ -3,22 +3,25 @@ import { PrismaLibSQL } from "@prisma/adapter-libsql";
 import { createClient } from "@libsql/client";
 
 const prismaClientSingleton = () => {
-    // Check if we are using Turso (Env vars present)
-    const url = process.env.TURSO_DATABASE_URL;
+    // Check for Turso specific variables or a combined DATABASE_URL
+    const url = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL;
     const authToken = process.env.TURSO_AUTH_TOKEN;
 
-    if (url && authToken) {
+    // If the URL looks like a Turso URL (libsql: or https: with authToken), use adapter
+    const isTurso = url?.startsWith("libsql:") || url?.startsWith("https:");
+
+    if (isTurso && authToken) {
         console.log("Using Turso (LibSQL) Adapter");
         const libsql = createClient({
-            url,
+            url: url!,
             authToken,
         });
         const adapter = new PrismaLibSQL(libsql as any);
-        // Cast to 'any' or specific options type if adapter is not in default types yet
         return new PrismaClient({ adapter } as any);
     }
 
-    // Default to local SQLite (Standard) or standard provider usage
+    // Default to local SQLite
+    console.log("Using Standard Prisma Client (SQLite)");
     return new PrismaClient();
 };
 
