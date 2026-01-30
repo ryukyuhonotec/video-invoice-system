@@ -7,7 +7,7 @@ export default function LoginPage() {
         <div className="flex h-screen items-center justify-center bg-zinc-50">
             <div className="w-full max-w-sm rounded-xl border bg-white p-8 shadow-sm">
                 <div className="mb-8 text-center">
-                    <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Video Invoice System</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-zinc-900">制作進行管理システム</h1>
                     <p className="mt-2 text-sm text-zinc-500">Googleアカウントでログインしてください</p>
                 </div>
 

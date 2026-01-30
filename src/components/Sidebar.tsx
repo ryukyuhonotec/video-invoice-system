@@ -34,8 +34,7 @@ export function Sidebar({ version = "0.1.0" }: { version?: string }) {
     return (
         <aside className="w-64 bg-zinc-900 text-zinc-300 min-h-screen flex flex-col fixed left-0 top-0 bottom-0 z-50">
             <div className="p-6">
-                <h1 className="text-xl font-bold text-white tracking-wider">VIDEO INVOICE</h1>
-                <p className="text-xs text-zinc-500 mt-1">制作進行管理システム</p>
+                <h1 className="text-xl font-bold text-white tracking-wider">制作進行管理システム</h1>
             </div>
             <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
                 {menuItems.map((item) => {

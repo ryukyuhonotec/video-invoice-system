@@ -1,6 +1,9 @@
 
-import { auth } from "@/auth"
+import NextAuth from "next-auth"
+import { authConfig } from "@/auth.config"
 import { NextResponse } from "next/server"
+
+const { auth } = NextAuth(authConfig)
 
 export default auth((req) => {
     // Allow access to public assets and api routes
@@ -9,6 +12,9 @@ export default auth((req) => {
 
     // Allow access to auth api routes
     if (req.nextUrl.pathname.startsWith("/api/auth")) return
+
+    // Allow access to invitation pages - Add this for safety if using invite links
+    if (req.nextUrl.pathname.startsWith('/invite')) return
 
     const isLoggedIn = !!req.auth
     const isOnLoginPage = req.nextUrl.pathname.startsWith('/login')

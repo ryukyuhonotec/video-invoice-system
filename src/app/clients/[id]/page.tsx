@@ -4,14 +4,11 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
-import { getClientStats, upsertClient, getStaff, getPartners } from "@/actions/pricing-actions";
-import { ArrowLeft, Building2, ExternalLink, Edit, Save, X, Link2 } from "lucide-react";
+import { getClientStats, upsertClient, getStaff, getPartners, getPricingRules } from "@/actions/pricing-actions";
+import { ArrowLeft, Building2, ExternalLink, Edit, X, Link2 } from "lucide-react";
 import Link from "next/link";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ClientForm } from "@/components/forms/ClientForm";
 
 const getStatusLabel = (status: string) => {
     switch (status) {
@@ -58,6 +55,7 @@ export default function ClientDetailPage() {
     const [data, setData] = useState<any>(null);
     const [staffList, setStaffList] = useState<any[]>([]);
     const [partners, setPartners] = useState<any[]>([]);
+    const [pricingRules, setPricingRules] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -67,14 +65,16 @@ export default function ClientDetailPage() {
         const load = async () => {
             if (params.id) {
                 try {
-                    const [res, staff, partnerData] = await Promise.all([
+                    const [res, staff, partnerData, pricingRulesData] = await Promise.all([
                         getClientStats(params.id as string),
                         getStaff(),
-                        getPartners()
+                        getPartners(),
+                        getPricingRules()
                     ]);
                     setData(res);
                     setStaffList(staff);
                     setPartners(partnerData as any);
+                    setPricingRules(pricingRulesData as any);
                 } catch (e) {
                     console.error(e);
                 } finally {
@@ -93,26 +93,10 @@ export default function ClientDetailPage() {
         setIsEditing(true);
     };
 
-    const togglePartner = (partnerId: string, isChecked: boolean) => {
-        const currentIds = editData.partnerIds || [];
-        let newIds = [];
-        if (isChecked) {
-            newIds = [...currentIds, partnerId];
-        } else {
-            newIds = currentIds.filter((id: string) => id !== partnerId);
-        }
-        setEditData({ ...editData, partnerIds: newIds });
-    };
-
-    const handleCancel = () => {
-        setIsEditing(false);
-        setEditData({});
-    };
-
-    const handleSave = async () => {
+    const handleSave = async (updatedData: any) => {
         setIsSaving(true);
         try {
-            await upsertClient(editData);
+            await upsertClient(updatedData);
             // Refresh data
             const res = await getClientStats(params.id as string);
             setData(res);
@@ -129,8 +113,6 @@ export default function ClientDetailPage() {
     if (!data) return <div className="p-8 text-center text-red-500 dark:text-red-400">データが見つかりません</div>;
 
     const { client, invoices, stats } = data;
-    const operationsStaff = staffList.filter(s => s.role === 'OPERATIONS');
-    const accountingStaff = staffList.filter(s => s.role === 'ACCOUNTING');
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -159,6 +141,24 @@ export default function ClientDetailPage() {
                     )}
                 </div>
             </header>
+
+            <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>クライアント情報を編集</DialogTitle>
+                    </DialogHeader>
+                    <ClientForm
+                        initialData={editData}
+                        staffList={staffList}
+                        partners={partners}
+                        onSave={handleSave}
+                        onCancel={() => setIsEditing(false)}
+
+                        isLoading={isSaving}
+                        pricingRules={pricingRules}
+                    />
+                </DialogContent>
+            </Dialog>
 
             {/* Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
@@ -209,133 +209,56 @@ export default function ClientDetailPage() {
             <div className="grid md:grid-cols-3 gap-8">
                 {/* Info Column */}
                 <div className="space-y-6">
-                    {/* Edit Form or Display */}
-                    {isEditing ? (
-                        <Card className="border-blue-300 dark:border-blue-700">
-                            <CardHeader className="flex flex-row items-center justify-between bg-blue-50 dark:bg-blue-900/20">
-                                <CardTitle className="text-base text-blue-800 dark:text-blue-200">クライアント情報を編集</CardTitle>
-                                <div className="flex gap-2">
-                                    <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
-                                        <X className="w-4 h-4 mr-1" /> キャンセル
-                                    </Button>
-                                    <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
-                                        <Save className="w-4 h-4 mr-1" /> {isSaving ? "保存中..." : "保存"}
-                                    </Button>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base dark:text-zinc-100">基本情報</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-sm">
+                            <div>
+                                <div className="text-zinc-500 dark:text-zinc-400 mb-1">メールアドレス</div>
+                                <div className="dark:text-zinc-200">{client.email || "-"}</div>
+                            </div>
+                            <div>
+                                <div className="text-zinc-500 dark:text-zinc-400 mb-1">Chatwork</div>
+                                {client.chatworkGroup ? (
+                                    <a href={client.chatworkGroup} target="_blank" className="text-blue-600 hover:underline break-all dark:text-blue-400">
+                                        {client.chatworkGroup}
+                                    </a>
+                                ) : (
+                                    <span className="dark:text-zinc-200">-</span>
+                                )}
+                            </div>
+                            <div>
+                                <div className="text-zinc-500 dark:text-zinc-400 mb-1">SNS</div>
+                                <div className="space-y-1 dark:text-zinc-200">
+                                    {client.sns1 && <div>{client.sns1}</div>}
+                                    {client.sns2 && <div>{client.sns2}</div>}
+                                    {client.sns3 && <div>{client.sns3}</div>}
+                                    {!client.sns1 && !client.sns2 && !client.sns3 && "-"}
                                 </div>
-                            </CardHeader>
-                            <CardContent className="space-y-4 pt-4">
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">会社名・屋号</Label>
-                                    <Input value={editData.name || ""} onChange={e => setEditData({ ...editData, name: e.target.value })} className="dark:bg-zinc-800" />
+                            </div>
+                            <div>
+                                <div className="text-zinc-500 dark:text-zinc-400 mb-1">備考</div>
+                                <div className="whitespace-pre-wrap text-zinc-700 bg-zinc-50 p-2 rounded dark:bg-zinc-800 dark:text-zinc-300">
+                                    {client.description || "なし"}
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">Webサイト</Label>
-                                    <Input value={editData.website || ""} onChange={e => setEditData({ ...editData, website: e.target.value })} className="dark:bg-zinc-800" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">担当者名</Label>
-                                    <Input value={editData.contactPerson || ""} onChange={e => setEditData({ ...editData, contactPerson: e.target.value })} className="dark:bg-zinc-800" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">メールアドレス</Label>
-                                    <Input value={editData.email || ""} onChange={e => setEditData({ ...editData, email: e.target.value })} className="dark:bg-zinc-800" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">Chatwork URL</Label>
-                                    <Input value={editData.chatworkGroup || ""} onChange={e => setEditData({ ...editData, chatworkGroup: e.target.value })} className="dark:bg-zinc-800" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">事業統括</Label>
-                                    <Select value={editData.operationsLeadId || ""} onChange={e => setEditData({ ...editData, operationsLeadId: e.target.value })} className="dark:bg-zinc-800">
-                                        <option value="">選択...</option>
-                                        {operationsStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">経理担当</Label>
-                                    <Select value={editData.accountantId || ""} onChange={e => setEditData({ ...editData, accountantId: e.target.value })} className="dark:bg-zinc-800">
-                                        <option value="">選択...</option>
-                                        {accountingStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">SNS / YouTube</Label>
-                                    <Input value={editData.sns1 || ""} onChange={e => setEditData({ ...editData, sns1: e.target.value })} placeholder="SNS 1" className="dark:bg-zinc-800 mb-2" />
-                                    <Input value={editData.sns2 || ""} onChange={e => setEditData({ ...editData, sns2: e.target.value })} placeholder="SNS 2" className="dark:bg-zinc-800 mb-2" />
-                                    <Input value={editData.sns3 || ""} onChange={e => setEditData({ ...editData, sns3: e.target.value })} placeholder="SNS 3" className="dark:bg-zinc-800" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">備考</Label>
-                                    <textarea
-                                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700"
-                                        value={editData.description || ""}
-                                        onChange={e => setEditData({ ...editData, description: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">担当パートナー</Label>
-                                    <SearchableMultiSelect
-                                        options={partners.map(p => ({ label: p.name, value: p.id }))}
-                                        selected={editData.partnerIds || []}
-                                        onChange={(ids) => setEditData({ ...editData, partnerIds: ids })}
-                                        placeholder="パートナーを選択..."
-                                        className="dark:bg-zinc-800"
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base dark:text-zinc-100">基本情報</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-sm">
-                                <div>
-                                    <div className="text-zinc-500 dark:text-zinc-400 mb-1">メールアドレス</div>
-                                    <div className="dark:text-zinc-200">{client.email || "-"}</div>
-                                </div>
-                                <div>
-                                    <div className="text-zinc-500 dark:text-zinc-400 mb-1">Chatwork</div>
-                                    {client.chatworkGroup ? (
-                                        <a href={client.chatworkGroup} target="_blank" className="text-blue-600 hover:underline break-all dark:text-blue-400">
-                                            {client.chatworkGroup}
-                                        </a>
+                            </div>
+                            <div>
+                                <div className="text-zinc-500 dark:text-zinc-400 mb-1">担当パートナー</div>
+                                <div className="flex flex-wrap gap-2">
+                                    {client.partners && client.partners.length > 0 ? (
+                                        client.partners.map((p: any) => (
+                                            <span key={p.id} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded dark:bg-green-900/40 dark:text-green-300">
+                                                {p.name}
+                                            </span>
+                                        ))
                                     ) : (
-                                        <span className="dark:text-zinc-200">-</span>
+                                        <span className="text-zinc-400 dark:text-zinc-500">-</span>
                                     )}
                                 </div>
-                                <div>
-                                    <div className="text-zinc-500 dark:text-zinc-400 mb-1">SNS</div>
-                                    <div className="space-y-1 dark:text-zinc-200">
-                                        {client.sns1 && <div>{client.sns1}</div>}
-                                        {client.sns2 && <div>{client.sns2}</div>}
-                                        {client.sns3 && <div>{client.sns3}</div>}
-                                        {!client.sns1 && !client.sns2 && !client.sns3 && "-"}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-zinc-500 dark:text-zinc-400 mb-1">備考</div>
-                                    <div className="whitespace-pre-wrap text-zinc-700 bg-zinc-50 p-2 rounded dark:bg-zinc-800 dark:text-zinc-300">
-                                        {client.description || "なし"}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-zinc-500 dark:text-zinc-400 mb-1">担当パートナー</div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {client.partners && client.partners.length > 0 ? (
-                                            client.partners.map((p: any) => (
-                                                <span key={p.id} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded dark:bg-green-900/40 dark:text-green-300">
-                                                    {p.name}
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <span className="text-zinc-400 dark:text-zinc-500">-</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     {/* Pricing Rules Card */}
                     <Card>

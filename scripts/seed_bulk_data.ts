@@ -1,93 +1,101 @@
 
-const { PrismaClient } = require("@prisma/client");
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Helper to get random item
+const random = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
+const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+
 async function main() {
-    console.log("Seeding bulk data...");
+    try {
+        console.log("Seeding 500 Invoices...");
 
-    // 1. Create 10 Partners
-    const partners = [];
-    for (let i = 1; i <= 10; i++) {
-        const p = await prisma.partner.create({
-            data: {
-                name: `Bulk Partner ${i}`,
-                role: "カメラマン",
-                email: `partner${i}@bulk.test`,
-                chatworkGroup: `https://chatwork.com/g/partner${i}`
-            }
-        });
-        partners.push(p);
-        console.log(`Created Partner: ${p.name}`);
-    }
+        const clients = await prisma.client.findMany();
+        const partners = await prisma.partner.findMany();
+        const rules = await prisma.pricingRule.findMany();
+        const staff = await prisma.staff.findMany();
 
-    // 2. Create 20 Pricing Rules
-    const rules = [];
-    for (let i = 1; i <= 20; i++) {
-        const r = await prisma.pricingRule.create({
-            data: {
-                name: `Bulk Rule ${i}`,
-                type: "FIXED",
-                fixedPrice: 10000 + (i * 1000),
-                fixedCost: 5000 + (i * 500),
-                description: "Bulk generated rule"
-            }
-        });
-        rules.push(r);
-        console.log(`Created Rule: ${r.name}`);
-    }
+        if (clients.length === 0 || partners.length === 0 || rules.length === 0) {
+            throw new Error("Master data missing. Run master seed first.");
+        }
 
-    // 3. Create 50 Invoices
-    const clients = await prisma.client.findMany();
-    const staffList = await prisma.staff.findMany();
+        const statuses = ["DRAFT", "IN_PROGRESS", "DELIVERED", "PAID"];
+        // Weighted: Draft(10%), InProgress(30%), Delivered(40%), Paid(20%)
 
-    if (clients.length === 0) {
-        throw new Error("No clients found. Please run Playwright test for clients first or create manually.");
-    }
+        for (let i = 1; i <= 500; i++) {
+            const client = random(clients);
+            const opsStaff = staff.find(s => s.role === 'OPERATIONS') || staff[0];
 
-    const staff = staffList[0]; // Assign first staff
+            // Determine Status
+            const r = Math.random();
+            let status = "DRAFT";
+            if (r > 0.1) status = "IN_PROGRESS";
+            if (r > 0.4) status = "DELIVERED";
+            if (r > 0.8) status = "PAID"; // Actually status string might be "請求済" or "入金済み" in UI/Logic, DB stores ENUM?
+            // Schema says String @default("DRAFT").
+            // Code uses constants: InvoiceStatusEnum.
+            // Let's use the Values seen in InvoiceForm: "受注前", "制作中", "納品済", "請求済", "入金済み"?
+            // Wait, InvoiceForm.tsx: status is passed as argument, constants likely map.
+            // Let's stick to DRAFT, IN_PROGRESS etc if backend supports mapped or raw.
+            // Schema default "DRAFT".
+            // Let's assume standard values.
 
-    for (let i = 1; i <= 50; i++) {
-        const client = clients[i % clients.length];
-        const status = i % 5 === 0 ? "PAID" : "DRAFT"; // Mix statuses
+            // "受注前" = DRAFT?
+            // "制作中" = IN_PROGRESS?
+            // "納品済" = DELIVERED?
+            // "請求済" = CLAIMED?
+            // "入金済み" = PAID?
 
-        await prisma.invoice.create({
-            data: {
-                clientId: client.id,
-                staffId: staff?.id,
-                status: status,
-                issueDate: new Date(),
-                dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 days
-                totalAmount: 15000 + (i * 100),
-                items: {
-                    create: [
-                        {
-                            name: `Bulk Item ${i}`,
+            // To be safe, I'll use the english codes if the app handles them (Prisma schema default is "DRAFT").
+
+            const itemPrice = randomInt(5, 50) * 10000; // 50k to 500k
+
+            // Dates
+            const now = new Date();
+            const issueDate = new Date(now.getFullYear(), now.getMonth(), randomInt(1, 28)); // This month
+
+            const invoice = await prisma.invoice.create({
+                data: {
+                    clientId: client.id,
+                    staffId: opsStaff?.id,
+                    status: status, // Using English codes for now
+                    issueDate: issueDate,
+                    subtotal: itemPrice,
+                    tax: itemPrice * 0.1,
+                    totalAmount: itemPrice * 1.1,
+                    totalCost: itemPrice * 0.6, // approx
+                    profit: itemPrice * 0.4,
+                    profitMargin: 40,
+                    items: {
+                        create: {
+                            name: `Production Service #${i}`,
                             quantity: 1,
-                            unitPrice: 15000 + (i * 100),
-                            amount: 15000 + (i * 100),
+                            unitPrice: itemPrice,
+                            amount: itemPrice,
                             outsources: {
-                                create: [
-                                    {
-                                        partnerId: partners[i % partners.length].id,
-                                        pricingRuleId: rules[i % rules.length].id,
-                                        status: "受注前",
-                                        revenueAmount: 15000 + (i * 100),
-                                        costAmount: 5000
-                                    }
-                                ]
+                                create: {
+                                    partnerId: random(partners).id,
+                                    pricingRuleId: random(rules).id,
+                                    revenueAmount: itemPrice,
+                                    costAmount: itemPrice * 0.6,
+                                    status: "PRE_ORDER" // Task status
+                                }
                             }
                         }
-                    ]
+                    }
                 }
-            }
-        });
-        console.log(`Created Invoice ${i} for Client ${client.name}`);
-    }
+            });
 
-    console.log("Bulk seeding complete.");
+            if (i % 50 === 0) console.log(`Created ${i} Invoices...`);
+        }
+
+        console.log("Seeding Complete.");
+    } catch (e) {
+        console.error(e);
+    } finally {
+        await prisma.$disconnect();
+    }
 }
 
-main()
-    .catch(console.error)
-    .finally(() => prisma.$disconnect());
+main();

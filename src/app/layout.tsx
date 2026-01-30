@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Video Invoice | 映像制作管理システム",
+  title: "制作進行管理システム",
   description: "映像制作事業向け 案件進行・請求管理システム",
 };
 

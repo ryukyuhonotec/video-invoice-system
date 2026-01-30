@@ -6,13 +6,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { getClients, upsertClient, getStaff, getPricingRules, getPartners } from "@/actions/pricing-actions";
 import { Client, Staff, PricingRule, Partner } from "@/types";
-import { Search, Plus, Filter, ExternalLink } from "lucide-react";
+import { Search, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ClientForm } from "@/components/forms/ClientForm";
 
 export default function ClientsPage() {
     const router = useRouter();
@@ -60,27 +60,16 @@ export default function ClientsPage() {
         setIsEditing(true);
     };
 
-    const handleSave = async () => {
-        if (!editingClient.name) return;
+    const handleSave = async (data: Partial<Client>) => {
+        if (!data.name) return;
         setIsLoading(true);
 
-        await upsertClient(editingClient);
+        await upsertClient(data);
         const updated = await getClients();
         setClients(updated as any);
 
         setIsEditing(false);
         setIsLoading(false);
-    };
-
-    const togglePartner = (partnerId: string, isChecked: boolean) => {
-        const currentIds = editingClient.partnerIds || [];
-        let newIds = [];
-        if (isChecked) {
-            newIds = [...currentIds, partnerId];
-        } else {
-            newIds = currentIds.filter(id => id !== partnerId);
-        }
-        setEditingClient({ ...editingClient, partnerIds: newIds });
     };
 
     // Filter clients based on search query and selected partner
@@ -188,174 +177,22 @@ export default function ClientsPage() {
                 </div>
             </div>
 
-            {isEditing && (
-                <Card className="mb-8 border-blue-200 bg-blue-50/20 dark:bg-blue-900/10 dark:border-blue-800">
-                    <CardHeader>
-                        <CardTitle className="dark:text-zinc-100">{editingClient.id ? "クライアント編集" : "新規クライアント登録"}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">会社名・屋号</Label>
-                                <Input
-                                    value={editingClient.name || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, name: e.target.value })}
-                                    placeholder="株式会社〇〇"
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">担当者名</Label>
-                                <Input
-                                    value={editingClient.contactPerson || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, contactPerson: e.target.value })}
-                                    placeholder="山田 太郎"
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">メールアドレス</Label>
-                                <Input
-                                    value={editingClient.email || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, email: e.target.value })}
-                                    placeholder="example@email.com"
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">Webサイト</Label>
-                                <Input
-                                    value={editingClient.website || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, website: e.target.value })}
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">SNS / YouTube</Label>
-                                <Input
-                                    value={editingClient.sns1 || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, sns1: e.target.value })}
-                                    placeholder="SNS 1"
-                                    className="dark:bg-zinc-800 mb-2"
-                                />
-                                <Input
-                                    value={editingClient.sns2 || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, sns2: e.target.value })}
-                                    placeholder="SNS 2"
-                                    className="dark:bg-zinc-800 mb-2"
-                                />
-                                <Input
-                                    value={editingClient.sns3 || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, sns3: e.target.value })}
-                                    placeholder="SNS 3"
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">事業統括</Label>
-                                <Select
-                                    value={editingClient.operationsLeadId || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, operationsLeadId: e.target.value })}
-                                    className="dark:bg-zinc-800"
-                                >
-                                    <option value="">選択...</option>
-                                    {operationsStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">経理担当</Label>
-                                <Select
-                                    value={editingClient.accountantId || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, accountantId: e.target.value })}
-                                    className="dark:bg-zinc-800"
-                                >
-                                    <option value="">選択...</option>
-                                    {accountingStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">Chatwork グループURL</Label>
-                                <Input
-                                    value={editingClient.chatworkGroup || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, chatworkGroup: e.target.value })}
-                                    placeholder="https://www.chatwork.com/..."
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="col-span-2 space-y-2">
-                                <Label className="dark:text-zinc-300">備考</Label>
-                                <textarea
-                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700"
-                                    value={editingClient.description || ""}
-                                    onChange={e => setEditingClient({ ...editingClient, description: e.target.value })}
-                                    placeholder="備考情報..."
-                                />
-                            </div>
-                            <div className="col-span-2 space-y-2">
-                                <Label className="dark:text-zinc-300">アーカイブ設定</Label>
-                                <div className="flex items-center space-x-2 border p-3 rounded-md dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                                    <Checkbox
-                                        id="archive-client"
-                                        checked={editingClient.isArchived || false}
-                                        onCheckedChange={(checked) => setEditingClient({ ...editingClient, isArchived: checked as boolean })}
-                                    />
-                                    <label
-                                        htmlFor="archive-client"
-                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-zinc-300 cursor-pointer"
-                                    >
-                                        このクライアントをアーカイブする
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div className="col-span-2 space-y-2">
-                                <Label className="dark:text-zinc-300">担当パートナー</Label>
-                                <SearchableMultiSelect
-                                    options={partners.map(p => ({ label: p.name, value: p.id }))}
-                                    selected={editingClient.partnerIds || []}
-                                    onChange={(ids) => setEditingClient({ ...editingClient, partnerIds: ids })}
-                                    placeholder="パートナーを選択..."
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-
-                            {/* Contract Status */}
-                            <div className="col-span-2 space-y-2">
-                                <Label className="dark:text-zinc-300">契約状況</Label>
-                                <div className="flex items-center space-x-2 border p-3 rounded-md dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                                    <Checkbox
-                                        id="contract-signed-client"
-                                        checked={editingClient.contractSigned || false}
-                                        onCheckedChange={(checked) => setEditingClient({ ...editingClient, contractSigned: checked as boolean })}
-                                    />
-                                    <label
-                                        htmlFor="contract-signed-client"
-                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-zinc-300 cursor-pointer"
-                                    >
-                                        契約締結済み
-                                    </label>
-                                </div>
-                                {editingClient.contractSigned && (
-                                    <Input
-                                        value={editingClient.contractUrl || ""}
-                                        onChange={e => setEditingClient({ ...editingClient, contractUrl: e.target.value })}
-                                        placeholder="契約書リンク (URL)"
-                                        className="dark:bg-zinc-800"
-                                    />
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setIsEditing(false)}>キャンセル</Button>
-                            <Button onClick={handleSave} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">
-                                {isLoading ? "保存中..." : "保存"}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-
+            <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{editingClient.id ? "クライアント編集" : "新規クライアント登録"}</DialogTitle>
+                    </DialogHeader>
+                    <ClientForm
+                        initialData={editingClient}
+                        staffList={staffList}
+                        partners={partners}
+                        onSave={handleSave}
+                        onCancel={() => setIsEditing(false)}
+                        isLoading={isLoading}
+                        pricingRules={pricingRules}
+                    />
+                </DialogContent>
+            </Dialog>
 
             <Card className="dark:bg-zinc-900 dark:border-zinc-800">
                 <CardHeader>

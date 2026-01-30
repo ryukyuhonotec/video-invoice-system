@@ -6,10 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,9 +18,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { getPartnerRoles, getPartners, upsertPartner, deletePartnerRole, getClients, addPartnerRole, getPaginatedPartners } from "@/actions/pricing-actions";
+import { getPartnerRoles, getPartners, upsertPartner, deletePartnerRole, getClients, addPartnerRole, getPaginatedPartners, getPricingRules } from "@/actions/pricing-actions";
 import { Partner, PartnerRole } from "@/types";
-import { Search, Plus, Archive, AlertCircle, ExternalLink, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PartnerForm } from "@/components/forms/PartnerForm";
 
 export default function PartnersPage() {
     return (
@@ -37,6 +37,7 @@ function PartnersPageContent() {
     const [partners, setPartners] = useState<Partner[]>([]);
     const [roles, setRoles] = useState<PartnerRole[]>([]);
     const [clients, setClients] = useState<any[]>([]);
+    const [pricingRules, setPricingRules] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [editingPartner, setEditingPartner] = useState<Partial<Partner> & { clientIds?: string[] }>({});
@@ -52,8 +53,6 @@ function PartnersPageContent() {
     const [showArchived, setShowArchived] = useState(false);
     const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>("ALL");
 
-    const [newRoleName, setNewRoleName] = useState("");
-    const [isAddingRole, setIsAddingRole] = useState(false);
     const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
     const [roleDeleteCount, setRoleDeleteCount] = useState<number>(0);
 
@@ -76,18 +75,19 @@ function PartnersPageContent() {
     const fetchPartners = async () => {
         setIsLoading(true);
         try {
-            const [pData, rData, cData] = await Promise.all([
+            const [pData, rData, cData, pricingRulesData] = await Promise.all([
                 getPaginatedPartners(currentPage, ITEMS_PER_PAGE, debouncedSearch, selectedRoleFilter, showArchived),
                 getPartnerRoles(),
-                getClients()
+                getClients(),
+                getPricingRules()
             ]);
-
             setPartners(pData.partners as any);
             setTotalItems(pData.total);
             setTotalPages(pData.totalPages);
 
             setRoles(rData as any);
             setClients(cData as any);
+            setPricingRules(pricingRulesData as any);
         } catch (error) {
             console.error("Failed to load partners:", error);
         } finally {
@@ -127,11 +127,11 @@ function PartnersPageContent() {
         setIsEditing(true);
     };
 
-    const handleSave = async () => {
-        if (!editingPartner.name) return;
+    const handleSave = async (data: Partial<Partner>) => {
+        if (!data.name) return;
         setIsLoading(true);
 
-        await upsertPartner(editingPartner);
+        await upsertPartner(data);
         // Refresh Current Page
         await fetchPartners();
 
@@ -139,26 +139,16 @@ function PartnersPageContent() {
         setIsLoading(false);
     };
 
-    const handleAddRole = async () => {
-        if (!newRoleName) return;
-        setIsAddingRole(true);
-        const res = await addPartnerRole(newRoleName);
+    const handleAddRoleWrapper = async (name: string) => {
+        const res = await addPartnerRole(name);
         if (res?.success) {
             const rData = await getPartnerRoles();
             setRoles(rData as any);
-
-            // Auto-select the new role (Fix #8)
-            const currentRoles = (editingPartner.role || "").split(",").filter(r => r.trim() !== "");
-            if (!currentRoles.includes(newRoleName)) {
-                const newRoles = [...currentRoles, newRoleName];
-                setEditingPartner(prev => ({ ...prev, role: newRoles.join(",") }));
-            }
-
-            setNewRoleName("");
+            return true;
         } else {
             alert("役割の追加に失敗しました");
+            return false;
         }
-        setIsAddingRole(false);
     };
 
     const handleDeleteRole = (id: string, e?: React.MouseEvent) => {
@@ -176,6 +166,11 @@ function PartnersPageContent() {
         setRoleToDelete(id);
     };
 
+    const requestDeleteRole = async (id: string) => {
+        handleDeleteRole(id);
+        return true;
+    };
+
     const executeDeleteRole = async () => {
         if (!roleToDelete) return;
 
@@ -191,32 +186,10 @@ function PartnersPageContent() {
         setRoleToDelete(null);
     };
 
-    const toggleRole = (roleName: string, isChecked: boolean) => {
-        const currentRoles = (editingPartner.role || "").split(",").filter(r => r.trim() !== "");
-        let newRoles = [];
-        if (isChecked) {
-            newRoles = [...currentRoles, roleName];
-        } else {
-            newRoles = currentRoles.filter(r => r !== roleName);
-        }
-        setEditingPartner({ ...editingPartner, role: newRoles.join(",") });
-    };
-
-    const toggleClient = (clientId: string, isChecked: boolean) => {
-        const currentIds = editingPartner.clientIds || [];
-        let newIds = [];
-        if (isChecked) {
-            newIds = [...currentIds, clientId];
-        } else {
-            newIds = currentIds.filter(id => id !== clientId);
-        }
-        setEditingPartner({ ...editingPartner, clientIds: newIds });
-    };
-
     // Filter partners is now effectively a pass-through since server does filtered
-    const filteredPartners = partners;
+    // ... logic moved to server
 
-    // Derive available roles from both Master Data and Usage (Fix #3)
+    // Derive available roles from both Master Data and Usage
     const availableRoles = useMemo(() => {
         const roleSet = new Set(roles.map(r => r.name));
         partners.forEach(p => {
@@ -262,158 +235,24 @@ function PartnersPageContent() {
                 </Button>
             </header>
 
-            {isEditing && (
-                <Card className="mb-8 border-blue-200 bg-blue-50/20 dark:bg-blue-900/10 dark:border-blue-800">
-                    <CardHeader>
-                        <CardTitle className="dark:text-zinc-100">{editingPartner.id ? "パートナー編集" : "新規パートナー登録"}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">氏名</Label>
-                                <Input
-                                    value={editingPartner.name || ""}
-                                    onChange={e => setEditingPartner({ ...editingPartner, name: e.target.value })}
-                                    placeholder="山田 太郎"
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">役割（複数選択可）</Label>
-                                <div className="p-3 border rounded-md dark:border-zinc-700 space-y-3 bg-zinc-50 dark:bg-zinc-800/50 max-h-48 overflow-y-auto">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {roles.map(role => (
-                                            <div key={role.id} className="flex items-center justify-between space-x-2 group">
-                                                <div className="flex items-center space-x-2">
-                                                    <Checkbox
-                                                        id={`role-${role.id}`}
-                                                        checked={(editingPartner.role || "").split(",").includes(role.name)}
-                                                        onCheckedChange={(checked) => toggleRole(role.name, checked as boolean)}
-                                                    />
-                                                    <label
-                                                        htmlFor={`role-${role.id}`}
-                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-zinc-300 cursor-pointer"
-                                                    >
-                                                        {role.name}
-                                                    </label>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={(e) => handleDeleteRole(role.id, e)}
-                                                >
-                                                    <Trash2 className="h-3 w-3" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Add New Role */}
-                                <div className="flex gap-2 pt-1">
-                                    <Input
-                                        value={newRoleName}
-                                        onChange={(e) => setNewRoleName(e.target.value)}
-                                        placeholder="新しい役割名"
-                                        className="h-8 text-sm dark:bg-zinc-800"
-                                    />
-                                    <Button size="sm" type="button" variant="outline" onClick={handleAddRole} disabled={!newRoleName || isAddingRole} className="h-8">
-                                        <Plus className="w-3 h-3 mr-1" /> 追加
-                                    </Button>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">メールアドレス</Label>
-                                <Input
-                                    value={editingPartner.email || ""}
-                                    onChange={e => setEditingPartner({ ...editingPartner, email: e.target.value })}
-                                    placeholder="example@email.com"
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">Chatwork グループURL</Label>
-                                <Input
-                                    value={editingPartner.chatworkGroup || ""}
-                                    onChange={e => setEditingPartner({ ...editingPartner, chatworkGroup: e.target.value })}
-                                    placeholder="https://www.chatwork.com/g/..."
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">担当クライアント</Label>
-                                <SearchableMultiSelect
-                                    options={clients.map(c => ({ label: c.name, value: c.id }))}
-                                    selected={editingPartner.clientIds || []}
-                                    onChange={(ids) => setEditingPartner({ ...editingPartner, clientIds: ids })}
-                                    placeholder="クライアントを選択..."
-                                    className="dark:bg-zinc-800"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">アーカイブ設定</Label>
-                                <div className="flex items-center space-x-2 border p-3 rounded-md dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                                    <Checkbox
-                                        id="archive-partner"
-                                        checked={editingPartner.isArchived || false}
-                                        onCheckedChange={(checked) => setEditingPartner({ ...editingPartner, isArchived: checked as boolean })}
-                                    />
-                                    <label
-                                        htmlFor="archive-partner"
-                                        className="text-sm font-medium leading-none dark:text-zinc-300 cursor-pointer"
-                                    >
-                                        このパートナーをアーカイブする（一覧に表示しない）
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* Contract Status */}
-                            <div className="space-y-2">
-                                <Label className="dark:text-zinc-300">契約状況</Label>
-                                <div className="flex items-center space-x-2 border p-3 rounded-md dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                                    <Checkbox
-                                        id="contract-signed"
-                                        checked={editingPartner.contractSigned || false}
-                                        onCheckedChange={(checked) => setEditingPartner({ ...editingPartner, contractSigned: checked as boolean })}
-                                    />
-                                    <label
-                                        htmlFor="contract-signed"
-                                        className="text-sm font-medium leading-none dark:text-zinc-300 cursor-pointer"
-                                    >
-                                        契約締結済み
-                                    </label>
-                                </div>
-                                {editingPartner.contractSigned && (
-                                    <Input
-                                        value={editingPartner.contractUrl || ""}
-                                        onChange={e => setEditingPartner({ ...editingPartner, contractUrl: e.target.value })}
-                                        placeholder="契約書リンク (URL)"
-                                        className="dark:bg-zinc-800 mt-2"
-                                    />
-                                )}
-                            </div>
-
-                            <div className="col-span-2 space-y-2">
-                                <Label className="dark:text-zinc-300">備考</Label>
-                                <textarea
-                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700"
-                                    value={editingPartner.description || ""}
-                                    onChange={e => setEditingPartner({ ...editingPartner, description: e.target.value })}
-                                    placeholder="備考情報..."
-                                />
-                            </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setIsEditing(false)}>キャンセル</Button>
-                            <Button onClick={handleSave} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700">
-                                {isLoading ? "保存中..." : "保存"}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+            <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{editingPartner.id ? "パートナー編集" : "新規パートナー登録"}</DialogTitle>
+                    </DialogHeader>
+                    <PartnerForm
+                        initialData={editingPartner}
+                        roles={roles}
+                        clients={clients}
+                        onSave={handleSave}
+                        onCancel={() => setIsEditing(false)}
+                        onAddRole={handleAddRoleWrapper}
+                        onDeleteRole={requestDeleteRole}
+                        isLoading={isLoading}
+                        pricingRules={pricingRules}
+                    />
+                </DialogContent>
+            </Dialog>
 
             <div className="flex items-center gap-4 w-full mb-6">
                 <div className="relative max-w-md flex-1">
@@ -496,7 +335,12 @@ function PartnersPageContent() {
                                                 <tr
                                                     key={p.id}
                                                     className="border-b transition-colors hover:bg-blue-50 cursor-pointer dark:border-zinc-700 dark:hover:bg-blue-900/30"
-                                                    onClick={() => router.push(`/partners/${p.id}`)}
+                                                    onClick={() => router.push(`/partners/${p.id}`)} // This navigates to detail page if it exists. Original did not. 
+                                                // Wait, original did not navigate to `/partners/[id]`? The routing file structure shows `partners/page.tsx` but DOES NOT Show `partners/[id]/page.tsx` in my `list_dir`?
+                                                // I should check if `/partners/[id]` exists. The original `partners/page.tsx` had `onClick={() => router.push(...)}`?
+                                                // Let's check original.
+                                                // Original `view_file` (Step 1965/66) Lines 499: `onClick={() => router.push(/partners/${p.id})}`.
+                                                // So it DID navigate.
                                                 >
                                                     <td className="p-4 align-middle">
                                                         <div className="flex items-center gap-1">

@@ -352,21 +352,40 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
         };
     };
 
-    const validateForm = () => {
+    // Validation Helper
+    const validateForm = (targetStatus: InvoiceStatus) => {
         const errors: { [key: string]: string } = {};
 
+        // 1. Client & Staff Validation (Always Required)
         if (!selectedClientId) {
             errors['clientId'] = "クライアントを選択してください";
         }
+        if (!selectedStaffId) {
+            errors['staffId'] = "自社担当者(事業統括)を選択してください";
+        }
 
+        // 2. Item & Task Validation
         items.forEach((item, i) => {
             if (!item.name || !item.name.trim()) {
                 errors[`items.${i}.name`] = "品目名を入力してください";
             }
+
+            // Task Validation
             (item.outsources || []).forEach((task, j) => {
-                if (!task.pricingRuleId) {
-                    errors[`items.${i}.outsources.${j}.pricingRuleId`] = "料金ルールを選択してください";
+                // Pricing Rule is only required if status is NOT 'Draft' (受注前)
+                // User Requirement: "受注前" (Draft) does not need pricing rule yet.
+                // "受注確定" (Order Confirmed) or later requires it? 
+                // User said: "進行になってからパートナーの担当ついてタスクの金額ルールが設定される" -> Likely "受注確定" or "制作中".
+                // Let's enforce it for anything other than '受注前' (DRAFT).
+
+                const isDraft = targetStatus === InvoiceStatusEnum.DRAFT || (targetStatus as string) === "受注前";
+
+                if (!isDraft && !task.pricingRuleId) {
+                    errors[`items.${i}.outsources.${j}.pricingRuleId`] = "料金ルールを選択してください (進行案件には必須です)";
                 }
+
+                // Also Partner might be needed if not Draft? User said "Partner assigned after progress"
+                // For now, focusing on the reported error (PricingRule).
             });
         });
 
@@ -376,106 +395,20 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
 
     // --- Form Submission ---
 
-    const handleSave = async (status: InvoiceStatus) => {
-        setIsSaving(true);
-        setErrorSummary([]); // Clear previous errors
-
-        // Validation (Skip most for DRAFT, but Client is required by DB)
-        if (status === InvoiceStatusEnum.DRAFT) {
-            if (!selectedClientId) {
-                toast.error("クライアントを選択してください", { description: "下書き保存にもクライアントの指定が必要です" });
-                setIsSaving(false);
-                return;
-            }
-        } else if ((status as string) !== InvoiceStatusEnum.DRAFT) {
-            const errors: string[] = [];
-            const warnings: string[] = [];
-            if (!selectedClientId) errors.push("クライアントを選択してください"); // Changed clientId to selectedClientId
-            if (!selectedStaffId) errors.push("自社担当者を選択してください"); // Changed staffId to selectedStaffId
-
-            // Item validation
-            items.forEach((item, index) => {
-                if (!item.name) errors.push(`項目 #${index + 1}: 項目名を入力してください`);
-
-                // Check for Pricing Rule Divergence vs Manual Entry
-                (item.outsources || []).forEach((task, tIndex) => {
-                    const std = calculateStandardPrice(task);
-                    // Only warn if there IS a rule selected, and the amount differs
-                    if (task.pricingRuleId && Math.abs(task.revenueAmount - std.revenue) > 1) {
-                        warnings.push(`項目 #${index + 1} (タスク ${tIndex + 1}): 金額(¥${task.revenueAmount.toLocaleString()})が規定値(¥${std.revenue.toLocaleString()})と異なります`);
-                    }
-                });
-            });
-
-            if (warnings.length > 0) {
-                if (!window.confirm("以下の設定と異なる金額が含まれていますが、保存しますか？\n\n" + warnings.join("\n"))) {
-                    setIsSaving(false);
-                    return;
-                }
-            }
-
-            if (errors.length > 0) {
-                setErrorSummary(errors);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                toast.error("入力内容に不備があります", {
-                    description: "エラーメッセージを確認してください"
-                });
-                setIsSaving(false);
-                return;
-            }
-        }
-
-        try {
-            const invoiceData: any = {
-                id: initialData?.id,
-                clientId: selectedClientId,
-                staffId: selectedStaffId || null, // Ensure empty string becomes null
-                issueDate: invoiceDate ? new Date(invoiceDate) : new Date(), // ensure Date object
-                actualDeliveryDate: actualDeliveryDate ? new Date(actualDeliveryDate) : null, // Added actualDeliveryDate
-                requestUrl: requestUrl, // Added requestUrl
-                deliveryUrl: deliveryUrl, // Added deliveryUrl
-                deliveryNote: deliveryNote, // Added deliveryNote
-                status, // Use passed status
-                items: items.map(item => ({
-                    ...item,
-                    outsources: (item.outsources || []).map(out => ({ // Added || []
-                        ...out,
-                        // Ensure optional fields are handled
-                    }))
-                })),
-                subtotal, // Added subtotal
-                tax, // Added tax
-                totalAmount: totalRevenue, // Added totalAmount
-                totalCost, // Added totalCost
-                profit: estimatedProfit, // Added profit
-                profitMargin // Added profitMargin
-            };
-
-            const result = await upsertInvoice(invoiceData);
-
-            if (result.success) {
-                toast.success(status === InvoiceStatusEnum.DRAFT ? "下書き保存しました" : "保存しました"); // Changed InvoiceStatus to InvoiceStatusEnum
-                router.push("/invoices");
-                router.refresh();
-            } else {
-                throw new Error(result.error);
-            }
-        } catch (error) {
-            console.error("Save error:", error);
-            toast.error("保存に失敗しました", { description: String(error) });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
     const handleInitialSave = async (setDeliveredStatus = false) => {
         // Validation & Discrepancy Check
-        if (!validateForm()) {
+        // Pass the current selected status or implied status to validation
+        // 'setDeliveredStatus' implies we are moving to Delivered? 
+        // For now, assume validation against the CURRENT selected Invoice Status is what matters for "Save".
+        if (!validateForm(invoiceStatus)) {
             // Calculate errors strictly to find target ID immediately
             let targetId = "";
             if (!selectedClientId) {
                 targetId = "clientId";
+            } else if (!selectedStaffId) {
+                targetId = "staffId"; // Check Staff
             } else {
+                const isDraft = invoiceStatus === InvoiceStatusEnum.DRAFT || (invoiceStatus as string) === "受注前";
                 for (let i = 0; i < items.length; i++) {
                     if (!items[i].name || !items[i].name!.trim()) {
                         targetId = `items.${i}.name`;
@@ -483,7 +416,8 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                     }
                     if (items[i].outsources) {
                         for (let j = 0; j < items[i].outsources!.length; j++) {
-                            if (!items[i].outsources![j].pricingRuleId) {
+                            // Only check Pricing Rule if NOT Draft
+                            if (!isDraft && !items[i].outsources![j].pricingRuleId) {
                                 targetId = `items.${i}.outsources.${j}.pricingRuleId`;
                                 break;
                             }
@@ -494,7 +428,7 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
             }
 
             if (targetId) {
-                // Small timeout to allow React to render any error states/classes if needed, though ID should exist
+                // Small timeout to allow React to render any error states/classes
                 setTimeout(() => {
                     const el = document.getElementById(targetId);
                     if (el) {
@@ -703,11 +637,20 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
                         {/* Client Search Row */}
                         <div className="grid md:grid-cols-12 gap-4 items-end" ref={clientSearchRef}>
                             <div className="md:col-span-3 space-y-1">
-                                <Label className="text-xs text-zinc-500 dark:text-zinc-400">事業統括で絞込</Label>
-                                <Select value={selectedStaffFilter} onChange={(e) => setSelectedStaffFilter(e.target.value)} className="text-sm h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
-                                    <option value="">全員</option>
+                                <Label className="text-xs text-zinc-500 dark:text-zinc-400">事業統括 (必須)</Label>
+                                <Select
+                                    value={selectedStaffFilter}
+                                    onChange={(e) => {
+                                        setSelectedStaffFilter(e.target.value);
+                                        // Auto-select if it's a specific person (not 'all')
+                                        if (e.target.value) setSelectedStaffId(e.target.value);
+                                    }}
+                                    className={`text-sm h-10 bg-white border-blue-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100 ${validationErrors['staffId'] ? 'ring-2 ring-red-500' : ''}`}
+                                >
+                                    <option value="">担当者を選択</option>
                                     {operationsStaff.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
                                 </Select>
+                                {validationErrors['staffId'] && <span className="text-xs text-red-500">{validationErrors['staffId']}</span>}
                             </div>
                             <div className="md:col-span-5 space-y-1 relative">
                                 <Label className="text-xs text-zinc-500 dark:text-zinc-400" htmlFor="clientId">クライアント検索</Label>

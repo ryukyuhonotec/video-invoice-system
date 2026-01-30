@@ -112,6 +112,9 @@ export async function upsertClient(data: any) {
 
     // Partners relation
     const partnerConnect = partnerIds?.map((pid: string) => ({ id: pid })) || [];
+    // Pricing Rules relation
+    const pricingRuleConnect = rest.pricingRuleIds?.map((pid: string) => ({ id: pid })) || [];
+    if (rest.pricingRuleIds) delete rest.pricingRuleIds;
 
     // Convert empty strings to null for optional foreign key fields
     if (rest.operationsLeadId === "") rest.operationsLeadId = null;
@@ -123,12 +126,14 @@ export async function upsertClient(data: any) {
         where: { id: id || 'new' },
         update: {
             ...rest,
-            partners: { set: partnerConnect }
+            partners: { set: partnerConnect },
+            pricingRules: { set: pricingRuleConnect }
         },
         create: {
             ...rest,
             id: id && !id.startsWith('new-') ? id : undefined,
-            partners: { connect: partnerConnect }
+            partners: { connect: partnerConnect },
+            pricingRules: { connect: pricingRuleConnect }
         },
     });
 
@@ -317,6 +322,9 @@ export async function upsertPartner(data: any) {
 
     // Clients relation
     const clientConnect = clientIds?.map((cid: string) => ({ id: cid })) || [];
+    // Pricing Rules relation
+    const pricingRuleConnect = rest.pricingRuleIds?.map((pid: string) => ({ id: pid })) || [];
+    if (rest.pricingRuleIds) delete rest.pricingRuleIds;
 
     // Handle specific fields cleanup
     if (rest.email === "") rest.email = null;
@@ -329,12 +337,14 @@ export async function upsertPartner(data: any) {
         where: { id: id || 'new' },
         update: {
             ...rest,
-            clients: { set: clientConnect }
+            clients: { set: clientConnect },
+            pricingRules: { set: pricingRuleConnect }
         },
         create: {
             ...rest,
             id: id && !id.startsWith('p-new-') ? id : undefined,
-            clients: { connect: clientConnect }
+            clients: { connect: clientConnect },
+            pricingRules: { connect: pricingRuleConnect }
         },
     });
     revalidatePath('/partners');

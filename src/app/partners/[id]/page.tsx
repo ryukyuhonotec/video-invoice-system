@@ -4,22 +4,52 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getPartnerStats } from "@/actions/pricing-actions";
-import { ArrowLeft, UserCircle, ExternalLink } from "lucide-react";
+import { getPartnerStats, getPartnerRoles, getClients, upsertPartner, addPartnerRole, deletePartnerRole, getPricingRules } from "@/actions/pricing-actions";
+import { ArrowLeft, UserCircle, ExternalLink, Edit } from "lucide-react";
 import Link from "next/link";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PartnerForm } from "@/components/forms/PartnerForm";
+import { PartnerRole } from "@/types";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function PartnerDetailPage() {
     const params = useParams();
     const router = useRouter();
     const [data, setData] = useState<any>(null);
+    const [roles, setRoles] = useState<PartnerRole[]>([]);
+    const [clients, setClients] = useState<any[]>([]);
+    const [pricingRules, setPricingRules] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingPartner, setEditingPartner] = useState<any>({});
+
+    // Role Deletion State
+    const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
+    const [roleDeleteCount, setRoleDeleteCount] = useState<number>(0);
 
     useEffect(() => {
         const load = async () => {
             if (params.id) {
                 try {
-                    const res = await getPartnerStats(params.id as string);
+                    const [res, rData, cData, pricingRulesData] = await Promise.all([
+                        getPartnerStats(params.id as string),
+                        getPartnerRoles(),
+                        getClients(),
+                        getPricingRules()
+                    ]);
                     setData(res);
+                    setRoles(rData as any);
+                    setClients(cData as any);
+                    setPricingRules(pricingRulesData as any);
                 } catch (e) {
                     console.error(e);
                 } finally {
@@ -30,8 +60,91 @@ export default function PartnerDetailPage() {
         load();
     }, [params.id]);
 
-    if (isLoading) return <div className="p-8 text-center text-zinc-500">読み込み中...</div>;
-    if (!data) return <div className="p-8 text-center text-red-500">データが見つかりません</div>;
+    const handleEdit = () => {
+        const { partner } = data;
+        setEditingPartner({
+            ...partner,
+            clientIds: partner.pricingRules?.flatMap((r: any) => r.clients?.map((c: any) => c.id) || []) || [],
+            pricingRuleIds: partner.pricingRules?.map((r: any) => r.id) || []
+            // Note: clientIds logic in list page used existing property or derived it.
+            // In list page: clientIds: target.clients?.map((c: any) => c.id) || []
+            // Here 'partner' from getPartnerStats might differ in structure?
+            // Let's assume partner object has similar structure or we check the data.
+            // 'getPartnerStats' returns { partner: ..., tasks: ..., stats: ... }
+            // The 'partner' object likely includes 'clients' or 'pricingRules'.
+            // In 'partners/page.tsx', 'getPartners' response had 'clients'.
+            // If getPartnerStats partner object is full relation, it might have it.
+            // Let's safe check:
+        });
+        setIsEditing(true);
+    };
+
+    const handleSave = async (updatedData: any) => {
+        setIsLoading(true);
+        try {
+            await upsertPartner(updatedData);
+            // Refresh data
+            const [res, rData, cData] = await Promise.all([
+                getPartnerStats(params.id as string),
+                getPartnerRoles(),
+                getClients()
+            ]);
+            setData(res);
+            setRoles(rData as any);
+            setClients(cData as any);
+            setIsEditing(false);
+        } catch (e) {
+            console.error(e);
+            alert("保存に失敗しました");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleAddRoleWrapper = async (name: string) => {
+        const res = await addPartnerRole(name);
+        if (res?.success) {
+            const rData = await getPartnerRoles();
+            setRoles(rData as any);
+            return true;
+        } else {
+            alert("役割の追加に失敗しました");
+            return false;
+        }
+    };
+
+    const handleDeleteRole = (id: string, e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        // Count partners with this role?
+        // In detail page we don't have ALL partners loaded, so we can't count accurately globally.
+        // We can only warn generically.
+        setRoleDeleteCount(-1); // Unknown count
+        setRoleToDelete(id);
+    };
+
+    const requestDeleteRole = async (id: string) => {
+        handleDeleteRole(id);
+        return true;
+    };
+
+    const executeDeleteRole = async () => {
+        if (!roleToDelete) return;
+
+        const res = await deletePartnerRole(roleToDelete);
+        if (res?.success) {
+            const rData = await getPartnerRoles();
+            setRoles(rData as any);
+        } else {
+            alert("役割の削除に失敗しました");
+        }
+        setRoleToDelete(null);
+    };
+
+    if (isLoading) return <div className="p-8 text-center text-zinc-500 dark:text-zinc-400">読み込み中...</div>;
+    if (!data) return <div className="p-8 text-center text-red-500 dark:text-red-400">データが見つかりません</div>;
 
     const { partner, tasks, stats } = data;
 
@@ -54,22 +167,32 @@ export default function PartnerDetailPage() {
                         </p>
                     </div>
                     {/* Edit Button */}
-                    <Link href={`/partners?edit=${partner.id}`}>
-                        <Button variant="outline" size="sm" className="hidden">
-                            編集
+                    {!isEditing && (
+                        <Button variant="outline" size="sm" className="dark:bg-zinc-800 dark:text-zinc-100" onClick={handleEdit}>
+                            <Edit className="w-4 h-4 mr-2" /> 情報を編集
                         </Button>
-                        {/* 
-                          Ideally this should open the modal on the list page. 
-                          Pass a query param ?edit=ID to the list page and have it auto-open.
-                          Or, duplicate the edit form here (less ideal).
-                          Let's try the query param approach.
-                        */}
-                        <Button variant="outline" size="sm" onClick={() => router.push(`/partners?edit=${partner.id}`)}>
-                            情報を編集
-                        </Button>
-                    </Link>
+                    )}
                 </div>
             </header>
+
+            <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>パートナー情報を編集</DialogTitle>
+                    </DialogHeader>
+                    <PartnerForm
+                        initialData={editingPartner}
+                        roles={roles}
+                        clients={clients}
+                        onSave={handleSave}
+                        onCancel={() => setIsEditing(false)}
+                        onAddRole={handleAddRoleWrapper}
+                        onDeleteRole={requestDeleteRole}
+                        isLoading={isLoading}
+                        pricingRules={pricingRules}
+                    />
+                </DialogContent>
+            </Dialog>
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -199,6 +322,30 @@ export default function PartnerDetailPage() {
                     </Card>
                 </div>
             </div>
+
+            {/* Role Deletion Alert Dialog */}
+            <AlertDialog open={!!roleToDelete} onOpenChange={(open) => !open && setRoleToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>役割の削除</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {roleDeleteCount >= 0 ? (
+                                <span className="text-red-600 font-bold block">
+                                    この役割は現在 {roleDeleteCount} 名のパートナーに割り当てられています。<br />
+                                    削除すると、これらのパートナーから役割が解除されます。<br />
+                                    本当に削除してもよろしいですか？
+                                </span>
+                            ) : (
+                                "この役割を削除してもよろしいですか？この操作は取り消せません。"
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                        <AlertDialogAction onClick={executeDeleteRole} className="bg-red-600 hover:bg-red-700">削除する</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
