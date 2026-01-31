@@ -708,6 +708,30 @@ export async function getInvoices() {
     });
 }
 
+// Optimized for Dashboard
+export async function getDashboardInvoices() {
+    noStore();
+    return await prisma.invoice.findMany({
+        select: {
+            id: true,
+            clientId: true,
+            status: true,
+            issueDate: true,
+            totalAmount: true,
+            items: {
+                select: {
+                    outsources: {
+                        select: {
+                            costAmount: true
+                        }
+                    }
+                }
+            }
+        },
+        orderBy: { updatedAt: 'desc' }
+    });
+}
+
 export async function getInvoice(id: string) {
     return await prisma.invoice.findUnique({
         where: { id },

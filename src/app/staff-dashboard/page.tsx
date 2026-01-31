@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { upsertStaff, getStaff, getClients, getInvoices, addClientContact, getClientContactHistory, getCurrentUserRole, deleteStaff } from "@/actions/pricing-actions";
+import { upsertStaff, getStaff, getClients, getDashboardInvoices, addClientContact, getClientContactHistory, getCurrentUserRole, deleteStaff } from "@/actions/pricing-actions";
 import { Staff, Client, Invoice } from "@/types";
 import { Users, TrendingUp, Building2, ChevronLeft, ChevronRight, Percent, Phone, Calendar, MessageSquare, PenSquare, ShieldCheck, Calculator, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -61,7 +61,7 @@ function StaffDashboardContent() {
             const [staffData, clientsData, invoicesData, role] = await Promise.all([
                 getStaff(),
                 getClients(),
-                getInvoices(),
+                getDashboardInvoices(),
                 getCurrentUserRole()
             ]);
             setStaff(staffData as any);
@@ -208,7 +208,7 @@ function StaffDashboardContent() {
             // Calculate cost from outsources
             inv.items?.forEach((item: any) => {
                 (item.outsources || []).forEach((task: any) => {
-                    totalCost += task.amount || 0;
+                    totalCost += task.costAmount || 0;
                 });
             });
         });
@@ -233,7 +233,7 @@ function StaffDashboardContent() {
             // Add costs
             inv.items?.forEach((item: any) => {
                 (item.outsources || []).forEach((task: any) => {
-                    byClient[client.id].cost += task.amount || 0;
+                    byClient[client.id].cost += task.costAmount || 0;
                 });
             });
         });
@@ -253,7 +253,7 @@ function StaffDashboardContent() {
             invoiceCount++;
             inv.items?.forEach((item: any) => {
                 (item.outsources || []).forEach((task: any) => {
-                    cost += task.amount || 0;
+                    cost += task.costAmount || 0;
                 });
             });
         });

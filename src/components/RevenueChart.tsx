@@ -35,7 +35,7 @@ export default function RevenueChart({ invoices, clients, title = "売上構成"
             const client = clients.find(c => c.id === inv.clientId);
             if (!client) return;
 
-            const invoiceTotal = inv.items?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
+            const invoiceTotal = inv.totalAmount || 0;
 
             if (!revenueByClient[inv.clientId]) {
                 revenueByClient[inv.clientId] = { name: client.name, value: 0 };
