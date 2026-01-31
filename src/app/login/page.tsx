@@ -17,7 +17,12 @@ export default function LoginPage() {
                         await signIn("google", { redirectTo: "/" })
                     }}
                 >
-                    <Button className="w-full flex items-center justify-center gap-2" size="lg" type="submit">
+                    <Button
+                        className="w-full flex items-center justify-center gap-2 cursor-pointer transition-all hover:bg-zinc-100 hover:shadow-md active:scale-95 text-zinc-700 border border-zinc-200 bg-white"
+                        size="lg"
+                        type="submit"
+                        variant="outline"
+                    >
                         <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
                             <path
                                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -36,30 +41,10 @@ export default function LoginPage() {
                                 fill="#EA4335"
                             />
                         </svg>
-                        Googleでログイン
+                        <span className="font-medium">Googleでログイン</span>
                     </Button>
                 </form>
 
-                <div className="mt-8 pt-8 border-t">
-                    <p className="text-xs text-center text-zinc-500 mb-4">開発用ログイン (Googleが使えない場合)</p>
-                    <form
-                        action={async (formData) => {
-                            "use server"
-                            await signIn("credentials", formData, { redirectTo: "/" })
-                        }}
-                    >
-                        <input
-                            type="email"
-                            name="email"
-                            defaultValue="s.ono@honotec-movie.com"
-                            className="w-full mb-2 p-2 text-sm border rounded bg-zinc-50"
-                            placeholder="Email"
-                        />
-                        <Button className="w-full text-zinc-500" variant="outline" size="sm">
-                            ゲスト / 開発用ログイン
-                        </Button>
-                    </form>
-                </div>
             </div>
         </div>
     )

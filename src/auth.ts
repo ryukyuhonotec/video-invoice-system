@@ -3,6 +3,7 @@ import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import prisma from "@/lib/db"
+import { revalidatePath, revalidateTag } from "next/cache";
 import Credentials from "next-auth/providers/credentials"
 import { authConfig } from "./auth.config"
 
@@ -83,6 +84,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         }
                     });
                 }
+                revalidatePath('/staff');
+                // @ts-expect-error: Incorrect argument count in Next 16 definition
+                revalidateTag('staff');
             } catch (e) {
                 console.error("Error linking staff on createUser:", e);
             }
@@ -119,6 +123,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             } catch (e) {
                 console.error("Error linking staff on signIn:", e);
             }
+            revalidatePath('/staff');
+            revalidatePath('/staff');
+            // @ts-expect-error: Incorrect argument count in Next 16 definition
+            revalidateTag('staff');
         }
     }
 })
