@@ -35,6 +35,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
         })
     ],
+    callbacks: {
+        async session({ session, token }) {
+            if (session.user && token.sub) {
+                session.user.id = token.sub;
+                try {
+                    const staff = await prisma.staff.findUnique({
+                        where: { userId: token.sub }
+                    });
+                    if (staff) {
+                        (session.user as any).staffRole = staff.role;
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch staff role for session", e);
+                }
+            }
+            return session;
+        },
+        async jwt({ token, user }) {
+            if (user) {
+                token.id = user.id;
+            }
+            return token;
+        }
+    },
     // Callbacks are inherited from authConfig, no need to duplicate unless extending
     events: {
         createUser: async ({ user }) => {

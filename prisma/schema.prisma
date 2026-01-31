@@ -84,6 +84,10 @@ model Partner {
   // Contract Status
   contractSigned Boolean @default(false)
   contractUrl    String? // Link to signed contract
+  
+  // Tax / Invoice Registration
+  registrationNumber String? // T-Number (e.g. T12345...)
+  isTaxExempt        Boolean @default(false) // 免税事業者 (Unregistered)
 }
 
 model PartnerRole {

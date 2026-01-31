@@ -77,6 +77,8 @@ export interface Partner {
     isArchived?: boolean;
     contractSigned?: boolean;
     contractUrl?: string;
+    registrationNumber?: string | null;
+    isTaxExempt?: boolean;
 }
 
 export interface PartnerRole {

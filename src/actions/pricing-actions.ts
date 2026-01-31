@@ -352,6 +352,8 @@ export async function upsertPartner(data: any) {
 }
 
 export async function deletePartner(id: string) {
+    const session = await auth();
+    // (Optional) Add check here if needed, but currently open for operations
     await prisma.partner.delete({ where: { id } });
     revalidatePath('/partners');
 }
@@ -422,6 +424,31 @@ export async function getStaff() {
 }
 
 export async function upsertStaff(data: any) {
+    const session = await auth();
+    const currentUserRole = (session?.user as any)?.staffRole;
+    const currentUserId = session?.user?.id;
+
+    // RBAC:
+    // 1. OWNER can do anything
+    // 2. Others can only edit THEIR Linked Staff profile
+
+    // Fetch associated staff for current user
+    const currentStaff = await prisma.staff.findUnique({ where: { userId: currentUserId } });
+
+    if (currentUserRole !== 'OWNER') {
+        // If not owner, ensure they are editing their own profile
+        if (data.id && data.id !== currentStaff?.id) {
+            throw new Error("Forbidden: You can only edit your own profile.");
+        }
+
+        // Prevent Role Escalation/Change by non-owners
+        if (data.role && data.role !== currentStaff?.role) {
+            // throw new Error("Forbidden: You cannot change your own role."); 
+            // Ideally throwing, but strictly enforcing in data is safer:
+            data.role = currentStaff?.role; // Force revert role change
+        }
+    }
+
     const { id, ...rest } = data;
     const result = await prisma.staff.upsert({
         where: { id: id || 'new' },
@@ -437,6 +464,17 @@ export async function upsertStaff(data: any) {
 }
 
 export async function deleteStaff(id: string) {
+    const session = await auth();
+    const currentUserRole = (session?.user as any)?.staffRole;
+
+    if (currentUserRole !== 'OWNER') {
+        throw new Error("Forbidden: Only Owners can delete staff.");
+    }
+
+    // Prevent deleting self? or the last owner? 
+    // Logic: If target is also OWNER, maybe prevent unless there are other owners? 
+    // For now, basic check.
+
     await prisma.staff.delete({ where: { id } });
     revalidatePath('/staff');
     revalidatePath('/');

@@ -203,6 +203,35 @@ export function PartnerForm({ initialData, roles, clients, onSave, onCancel, onA
                     )}
                 </div>
 
+                {/* Invoice Registration (T-Number) */}
+                <div className="space-y-2">
+                    <Label className="dark:text-zinc-300">インボイス登録番号 (T番号)</Label>
+                    <div className="flex items-center space-x-2 mb-2 p-3 border rounded-md dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+                        <Checkbox
+                            id="tax-exempt"
+                            checked={formData.isTaxExempt || false}
+                            onCheckedChange={(checked) => {
+                                handleChange("isTaxExempt", checked as boolean);
+                                if (checked) handleChange("registrationNumber", null);
+                            }}
+                        />
+                        <label
+                            htmlFor="tax-exempt"
+                            className="text-sm font-medium leading-none dark:text-zinc-300 cursor-pointer"
+                        >
+                            未登録（免税事業者）
+                        </label>
+                    </div>
+                    {!formData.isTaxExempt && (
+                        <Input
+                            value={formData.registrationNumber || ""}
+                            onChange={e => handleChange("registrationNumber", e.target.value)}
+                            placeholder="T1234567890123"
+                            className="dark:bg-zinc-800"
+                        />
+                    )}
+                </div>
+
                 <div className="col-span-2 space-y-2">
                     <Label className="dark:text-zinc-300">備考</Label>
                     <textarea
