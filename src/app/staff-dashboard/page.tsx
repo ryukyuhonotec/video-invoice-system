@@ -682,14 +682,19 @@ function StaffDashboardContent() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="role">役割</Label>
-                            <Select
-                                value={editingStaff.role || 'OPERATIONS'}
-                                onChange={(e) => setEditingStaff({ ...editingStaff, role: e.target.value })}
-                            >
-                                <option value="OPERATIONS">事業統括</option>
-                                <option value="ACCOUNTING">経理</option>
-                                <option value="OWNER">オーナー / 事業統括</option>
-                            </Select>
+                            {editingStaff.role === 'OWNER' ? (
+                                <div className="flex items-center h-10 px-3 rounded-md border border-zinc-200 bg-zinc-100 text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-400">
+                                    <span className="text-sm">オーナー / 事業統括</span>
+                                </div>
+                            ) : (
+                                <Select
+                                    value={editingStaff.role || 'OPERATIONS'}
+                                    onChange={(e) => setEditingStaff({ ...editingStaff, role: e.target.value })}
+                                >
+                                    <option value="OPERATIONS">事業統括</option>
+                                    <option value="ACCOUNTING">経理</option>
+                                </Select>
+                            )}
                         </div>
                     </div>
                     <div className="flex justify-end gap-2">
