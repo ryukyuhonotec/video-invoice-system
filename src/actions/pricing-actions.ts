@@ -417,10 +417,15 @@ export async function deletePricingRule(id: string) {
 }
 
 // --- Staff (事業統括・経理) ---
+import { unstable_noStore as noStore } from 'next/cache';
+
 export async function getStaff() {
-    return await prisma.staff.findMany({
+    noStore(); // Force dynamic data fetch
+    const staff = await prisma.staff.findMany({
         orderBy: { name: 'asc' },
     });
+    console.log("API: getStaff returning:", JSON.stringify(staff, null, 2));
+    return staff;
 }
 
 export async function upsertStaff(data: any) {
