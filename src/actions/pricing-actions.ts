@@ -468,6 +468,11 @@ export async function upsertStaff(data: any) {
     return result;
 }
 
+export async function getCurrentUserRole() {
+    const session = await auth();
+    return (session?.user as any)?.staffRole;
+}
+
 export async function deleteStaff(id: string) {
     const session = await auth();
     const currentUserRole = (session?.user as any)?.staffRole;

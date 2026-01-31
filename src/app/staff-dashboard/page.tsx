@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { upsertStaff, getStaff, getClients, getInvoices, addClientContact, getClientContactHistory } from "@/actions/pricing-actions";
+import { upsertStaff, getStaff, getClients, getInvoices, addClientContact, getClientContactHistory, getCurrentUserRole, deleteStaff } from "@/actions/pricing-actions";
 import { Staff, Client, Invoice } from "@/types";
-import { Users, TrendingUp, Building2, ChevronLeft, ChevronRight, Percent, Phone, Calendar, MessageSquare, PenSquare, ShieldCheck, Calculator } from "lucide-react";
+import { Users, TrendingUp, Building2, ChevronLeft, ChevronRight, Percent, Phone, Calendar, MessageSquare, PenSquare, ShieldCheck, Calculator, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import RevenueChart from "@/components/RevenueChart";
 
@@ -33,6 +33,7 @@ function StaffDashboardContent() {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [selectedStaffId, setSelectedStaffId] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
+    const [currentUserRole, setCurrentUserRole] = useState<string>("");
 
     // Edit dialog state
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -57,14 +58,16 @@ function StaffDashboardContent() {
 
     useEffect(() => {
         const loadData = async () => {
-            const [staffData, clientsData, invoicesData] = await Promise.all([
+            const [staffData, clientsData, invoicesData, role] = await Promise.all([
                 getStaff(),
                 getClients(),
-                getInvoices()
+                getInvoices(),
+                getCurrentUserRole()
             ]);
             setStaff(staffData as any);
             setClients(clientsData as any);
             setInvoices(invoicesData as any);
+            setCurrentUserRole(role);
 
             // Sort staff for display: Operations first
             const sortedStaff = (staffData as any).sort((a: any, b: any) => {
@@ -101,14 +104,23 @@ function StaffDashboardContent() {
             });
             setStaff(sortedStaff);
             setEditDialogOpen(false);
-
-            // If the edited staff is the currently selected one, force re-render/update
-            if (editingStaff.id === selectedStaffId) {
-                // The state update of 'staff' will trigger re-renders where necessary
-            }
         } catch (error) {
             console.error("Failed to update staff", error);
             alert("更新に失敗しました");
+        }
+        setIsSaving(false);
+    };
+
+    const handleDeleteStaff = async () => {
+        if (!confirm("本当にこのスタッフを削除しますか？")) return;
+        setIsSaving(true);
+        try {
+            await deleteStaff(editingStaff.id);
+            setEditDialogOpen(false);
+            window.location.reload(); // Refresh to clear state
+        } catch (error) {
+            console.error("Failed to delete staff", error);
+            alert("削除に失敗しました（オーナー権限が必要です）");
         }
         setIsSaving(false);
     };
@@ -287,17 +299,19 @@ function StaffDashboardContent() {
                                 </option>
                             ))}
                         </Select>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setEditingStaff(selectedStaff || {});
-                                setEditDialogOpen(true);
-                            }}
-                            className="dark:bg-zinc-800 dark:border-zinc-700"
-                        >
-                            <PenSquare className="w-4 h-4 mr-2" />
-                            情報編集
-                        </Button>
+                        {currentUserRole === 'OWNER' && (
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setEditingStaff(selectedStaff || {});
+                                    setEditDialogOpen(true);
+                                }}
+                                className="dark:bg-zinc-800 dark:border-zinc-700"
+                            >
+                                <PenSquare className="w-4 h-4 mr-2" />
+                                情報編集
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -698,11 +712,20 @@ function StaffDashboardContent() {
                             )}
                         </div>
                     </div>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => setEditDialogOpen(false)}>キャンセル</Button>
-                        <Button onClick={handleSaveStaff} disabled={isSaving}>
-                            {isSaving ? "保存中..." : "保存"}
-                        </Button>
+
+                    <div className="flex justify-between items-center gap-2">
+                        {currentUserRole === 'OWNER' && (
+                            <Button variant="destructive" onClick={handleDeleteStaff} disabled={isSaving}>
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                削除
+                            </Button>
+                        )}
+                        <div className="flex gap-2">
+                            <Button variant="ghost" onClick={() => setEditDialogOpen(false)}>キャンセル</Button>
+                            <Button onClick={handleSaveStaff} disabled={isSaving}>
+                                {isSaving ? "保存中..." : "保存"}
+                            </Button>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
