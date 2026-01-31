@@ -677,7 +677,8 @@ function StaffDashboardContent() {
                             <Input
                                 id="email"
                                 value={editingStaff.email || ''}
-                                onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+                                readOnly
+                                className="bg-zinc-100 text-zinc-500 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-400"
                             />
                         </div>
                         <div className="space-y-2">
