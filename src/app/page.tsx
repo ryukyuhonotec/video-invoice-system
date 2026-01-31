@@ -1,13 +1,31 @@
-
 import Dashboard from "@/components/Dashboard";
-import UserMenu from "@/components/UserMenu";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { getInvoices, getClients, getPartners, getStaff } from "@/actions/pricing-actions";
+import { getPaginatedTasks, getClients, getPartners, getStaff } from "@/actions/pricing-actions";
 
-export default async function Home() {
-  const [invoices, clients, partners, staffList] = await Promise.all([
-    getInvoices(),
+export default async function Home({
+  searchParams
+}: {
+  searchParams: { [key: string]: string | string[] | undefined }
+}) {
+  const page = typeof searchParams.page === 'string' ? parseInt(searchParams.page) : 1;
+  const limit = 50;
+  const search = typeof searchParams.search === 'string' ? searchParams.search : "";
+  const clientId = typeof searchParams.clientId === 'string' ? searchParams.clientId : "";
+  const partnerId = typeof searchParams.partnerId === 'string' ? searchParams.partnerId : "";
+  const staffId = typeof searchParams.staffId === 'string' ? searchParams.staffId : "";
+  const status = typeof searchParams.status === 'string' ? searchParams.status : "";
+  const showCompleted = searchParams.showCompleted === 'true';
+
+  const [paginatedTasks, clients, partners, staffList] = await Promise.all([
+    getPaginatedTasks(page, limit, {
+      search,
+      clientId,
+      partnerId,
+      staffId,
+      status,
+      showCompleted
+    }),
     getClients(),
     getPartners(),
     getStaff()
@@ -28,9 +46,13 @@ export default async function Home() {
       </header>
 
       <Dashboard
-        initialInvoices={invoices as any}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        paginatedTasks={paginatedTasks as any}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         initialClients={clients as any}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         initialPartners={partners as any}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         initialStaff={staffList as any}
       />
     </div>

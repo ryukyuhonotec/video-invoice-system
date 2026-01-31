@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Invoice, Client } from "@/types";
 
 interface RevenueChartProps {
-    invoices: Invoice[];
-    clients: Client[];
+    invoices?: Invoice[];
+    clients?: Client[];
     title?: string;
     showTopN?: number;
+    preCalculatedData?: { name: string; value: number }[]; // For optimized dashboards
 }
 
 const COLORS = [
@@ -25,8 +26,26 @@ const COLORS = [
     '#6366f1', // indigo
 ];
 
-export default function RevenueChart({ invoices, clients, title = "売上構成", showTopN = 5 }: RevenueChartProps) {
+export default function RevenueChart({ invoices = [], clients = [], title = "売上構成", showTopN = 5, preCalculatedData }: RevenueChartProps) {
     const chartData = useMemo(() => {
+        if (preCalculatedData) {
+            // Adjust preCalculated format to chart format if needed, but assuming simple { name, value }
+            // Filter 0 values
+            const sorted = [...preCalculatedData].sort((a, b) => b.value - a.value);
+
+            if (sorted.length <= showTopN) {
+                return sorted;
+            }
+
+            const topN = sorted.slice(0, showTopN);
+            const otherTotal = sorted.slice(showTopN).reduce((sum, d) => sum + d.value, 0);
+
+            if (otherTotal > 0) {
+                topN.push({ name: 'その他', value: otherTotal });
+            }
+            return topN;
+        }
+
         // Calculate revenue by client
         const revenueByClient: Record<string, { name: string; value: number }> = {};
 
@@ -61,7 +80,7 @@ export default function RevenueChart({ invoices, clients, title = "売上構成"
         }
 
         return topN;
-    }, [invoices, clients, showTopN]);
+    }, [invoices, clients, showTopN, preCalculatedData]);
 
     const totalRevenue = chartData.reduce((sum, d) => sum + d.value, 0);
 

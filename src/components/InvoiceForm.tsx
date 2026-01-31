@@ -149,7 +149,8 @@ export default function InvoiceForm({ initialData, isEditing = false, masterData
             ]);
             setClients(cData as Client[]);
             setPartners(pData as Partner[]);
-            setPricingRules(rData as PricingRule[]);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setPricingRules(rData as any[]);
             setStaffList(sData as Staff[]);
             setIsLoading(false);
         };

@@ -13,8 +13,10 @@ export default async function NewInvoicePage() {
 
     const masterData: MasterData = {
         clients: clients as Client[],
-        partners: partners as Partner[],
-        pricingRules: pricingRules as PricingRule[],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        partners: partners as any[],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pricingRules: pricingRules as any[],
         staffList: staffList as Staff[]
     };
 

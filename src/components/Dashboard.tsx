@@ -1,171 +1,144 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Link from "next/link";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+// import Link from "next/link"; // Removed unused
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, FileText, Search } from "lucide-react";
-import { Invoice, Client, Partner, Staff } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Client, Partner, Staff } from "@/types";
+import { Search, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { useTransition, useState, useEffect } from "react";
+
+interface TaskView {
+    id: string; // Outsource ID
+    invoiceId: string; // Invoice ID (for linking)
+    itemId: string;
+    itemName: string;
+    taskName: string;
+    clientName: string;
+    clientId: string;
+    supervisorName: string; // Staff (Invoice owner)
+    staffId: string | null;
+    partnerName: string;
+    partnerId: string | null;
+    partnerChatworkUrl?: string | null;
+    operationsLeadName: string;
+    operationsLeadId?: string | null;
+    accountantName: string;
+    accountantId?: string | null;
+    deliveryDate: Date | null;
+    status: string;
+    revenueAmount: number;
+    costAmount: number;
+    duration?: string | null;
+    issueDate: Date | null;
+    requestUrl?: string | null;
+}
+
+interface PaginatedResult {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tasks: any[]; // Raw Prisma Output
+    total: number;
+    page: number;
+    totalPages: number;
+}
 
 interface DashboardProps {
-    initialInvoices: Invoice[];
+    paginatedTasks: PaginatedResult;
     initialClients: Client[];
     initialPartners: Partner[];
     initialStaff: Staff[];
 }
 
 export default function Dashboard({
-    initialInvoices,
+    paginatedTasks,
     initialClients,
     initialPartners,
     initialStaff
 }: DashboardProps) {
-    // 1. State Definitions
-    const [filterClient, setFilterClient] = useState("");
-    const [filterStaff, setFilterStaff] = useState("");
-    const [filterPartner, setFilterPartner] = useState("");
-    const [filterStatus, setFilterStatus] = useState("");
-    const [showCompleted, setShowCompleted] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const [isPending, startTransition] = useTransition();
 
-    // 2. Data Flattening and Sorting
-    const allTasks = useMemo(() => {
-        const tasks: any[] = [];
-        initialInvoices.forEach(inv => {
-            const client = initialClients.find(c => c.id === inv.clientId);
-            const supervisor = initialStaff.find(s => s.id === inv.staffId);
+    // Local state for debounced search
+    const [searchQuery, setSearchQuery] = useState(searchParams.get("search")?.toString() || "");
 
-            // Get operations lead and accountant from client
-            const operationsLead = client?.operationsLeadId
-                ? initialStaff.find(s => s.id === client.operationsLeadId)
-                : null;
-            const accountant = client?.accountantId
-                ? initialStaff.find(s => s.id === client.accountantId)
-                : null;
+    const updateFilter = (key: string, value: string | null) => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (value) {
+            params.set(key, value);
+        } else {
+            params.delete(key);
+        }
+        // Reset page on filter change
+        if (key !== "page") {
+            params.set("page", "1");
+        }
 
-            inv.items.forEach(item => {
-                (item.outsources || []).forEach(task => {
-                    const partner = initialPartners.find(p => p.id === task.partnerId);
+        startTransition(() => {
+            router.replace(`${pathname}?${params.toString()}`);
+        });
+    };
 
-                    const statusMap: Record<string, string> = {
-                        "DRAFT": "受注前",
-                        "IN_PROGRESS": "制作中",
-                        "PENDING": "確認中",
-                        "DELIVERED": "納品済",
-                        "BILLED": "請求済",
-                        "PAID": "入金済み",
-                        "SENT": "送付済",
-                        "COMPLETED": "完了",
-                        "LOST": "失注"
-                    };
-                    const statusLabel = statusMap[task.status] || task.status || item.productionStatus || "受注前";
-
-                    tasks.push({
-                        id: task.id,
-                        invoiceId: inv.id,
-                        itemId: item.id,
-                        itemName: item.name || "名称未設定",
-                        pricingRuleId: task.pricingRuleId,
-                        taskName: task.pricingRule?.name || "担当領域未設定",
-                        clientName: client?.name || "Unknown",
-                        clientId: inv.clientId,
-                        supervisorName: supervisor?.name || "-",
-                        staffId: inv.staffId,
-                        partnerName: partner?.name || "未定",
-                        partnerId: task.partnerId,
-                        partnerChatworkUrl: partner?.chatworkGroup ? `https://chatwork.com/#!rid${partner.chatworkGroup}` : null,
-                        operationsLeadName: operationsLead?.name || "-",
-                        operationsLeadId: client?.operationsLeadId,
-                        accountantName: accountant?.name || "-",
-                        accountantId: client?.accountantId,
-                        deliveryDate: task.deliveryDate,
-                        status: statusLabel,
-                        revenueAmount: task.revenueAmount || 0,
-                        costAmount: task.costAmount || 0,
-                        duration: item.duration,
-                        issueDate: inv.issueDate,
-                        requestUrl: inv.requestUrl // Add requestUrl
-                    });
-                });
-
-                // If no tasks, still show the item
-                if (!item.outsources || item.outsources.length === 0) {
-                    tasks.push({
-                        id: item.id,
-                        invoiceId: inv.id,
-                        itemId: item.id,
-                        itemName: item.name || "名称未設定",
-                        taskName: "-",
-                        clientName: client?.name || "Unknown",
-                        clientId: inv.clientId,
-                        supervisorName: supervisor?.name || "-",
-                        staffId: inv.staffId,
-                        partnerName: "未定",
-                        partnerId: null,
-                        operationsLeadName: operationsLead?.name || "-",
-                        operationsLeadId: client?.operationsLeadId,
-                        accountantName: accountant?.name || "-",
-                        accountantId: client?.accountantId,
-                        deliveryDate: null,
-                        status: item.productionStatus || "受注前",
-                        revenueAmount: item.amount || 0,
-                        costAmount: 0,
-                        duration: item.duration,
-                        issueDate: inv.issueDate,
-                        requestUrl: inv.requestUrl // Add requestUrl
-                    });
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (searchQuery !== (searchParams.get("search") || "")) {
+                const params = new URLSearchParams(searchParams.toString());
+                if (searchQuery) {
+                    params.set("search", searchQuery);
+                } else {
+                    params.delete("search");
                 }
-            });
-        });
+                params.set("page", "1");
 
-        // Sort by delivery date (earliest first), then by issue date
-        return tasks.sort((a, b) => {
-            if (a.deliveryDate && b.deliveryDate) {
-                return new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime();
+                startTransition(() => {
+                    router.replace(`${pathname}?${params.toString()}`);
+                });
             }
-            if (a.deliveryDate) return -1;
-            if (b.deliveryDate) return 1;
-            return new Date(b.issueDate || 0).getTime() - new Date(a.issueDate || 0).getTime();
-        });
-    }, [initialInvoices, initialClients, initialPartners, initialStaff]);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery, searchParams, pathname, router]); // Added router, pathname
 
-    // 3. Filtering Logic
-    const filteredTasks = useMemo(() => {
-        return allTasks.filter(task => {
-            // Status filter
-            if (filterStatus && task.status !== filterStatus) return false;
+    // Helper to format tasks from raw Prisma data to TaskView
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tasks: TaskView[] = paginatedTasks.tasks.map((task: any) => {
+        const invoiceItem = task.invoiceItem;
+        const invoice = invoiceItem?.invoice;
+        const client = invoice?.client;
+        const staff = invoice?.staff;
+        const pricingRule = task.pricingRule;
+        const partner = task.partner;
 
-            // Hide completed unless toggled
-            if (!showCompleted && !filterStatus) {
-                const completedStatuses = ["納品済", "請求済", "入金済み"];
-                if (completedStatuses.includes(task.status)) return false;
-            }
-
-            // Client filter
-            if (filterClient && task.clientId !== filterClient) return false;
-
-            // Staff filter
-            if (filterStaff && task.staffId !== filterStaff) return false;
-
-            // Partner filter
-            if (filterPartner && task.partnerId !== filterPartner) return false;
-
-            // Search query
-            if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                const matchesItemName = task.itemName?.toLowerCase().includes(query);
-                const matchesClient = task.clientName?.toLowerCase().includes(query);
-                const matchesPartner = task.partnerName?.toLowerCase().includes(query);
-                const matchesTaskName = task.taskName?.toLowerCase().includes(query);
-                if (!matchesItemName && !matchesClient && !matchesPartner && !matchesTaskName) return false;
-            }
-
-            return true;
-        });
-    }, [allTasks, filterClient, filterStaff, filterPartner, filterStatus, showCompleted, searchQuery]);
+        return {
+            id: task.id,
+            invoiceId: invoice?.id || "",
+            itemId: invoiceItem?.id || "",
+            itemName: invoiceItem?.name || "名称未設定",
+            taskName: pricingRule?.name || task.description || "担当領域未設定",
+            clientName: client?.name || "Unknown",
+            clientId: invoice?.clientId || "",
+            supervisorName: staff?.name || "-",
+            staffId: invoice?.staffId,
+            partnerName: partner?.name || "未定",
+            partnerId: task.partnerId,
+            partnerChatworkUrl: partner?.chatworkGroup ? `https://chatwork.com/#!rid${partner.chatworkGroup}` : null,
+            operationsLeadName: client?.operationsLead?.name || "-",
+            operationsLeadId: client?.operationsLeadId,
+            accountantName: client?.accountant?.name || "-",
+            accountantId: client?.accountantId,
+            deliveryDate: task.deliveryDate ? new Date(task.deliveryDate) : null,
+            status: task.status,
+            revenueAmount: task.revenueAmount || 0,
+            costAmount: task.costAmount || 0,
+            duration: task.duration,
+            issueDate: invoice?.issueDate ? new Date(invoice.issueDate) : null,
+            requestUrl: invoice?.requestUrl
+        };
+    });
 
     // 4. Status badge styling
     const getStatusBadge = (status: string) => {
@@ -184,34 +157,15 @@ export default function Dashboard({
         }
     };
 
-    // 5. Date formatting
-    const formatDate = (dateStr: string | null) => {
+    const formatDate = (dateStr: Date | null) => {
         if (!dateStr) return "-";
-        const d = new Date(dateStr);
-        return `${d.getMonth() + 1}/${d.getDate()}`;
+        return `${dateStr.getMonth() + 1}/${dateStr.getDate()}`;
     };
 
-    // Get unique statuses
-    const statuses = Array.from(new Set(allTasks.map(t => t.status))).sort();
+    const statuses = ["受注前", "制作中", "確認中", "納品済", "請求済", "入金済み", "完了", "失注"];
 
     return (
         <>
-            {/* Summary Stats - Only 制作中 and 確認中 */}
-            <div className="grid grid-cols-2 gap-4 mb-6 max-w-md">
-                <Card>
-                    <CardContent className="pt-4 text-center">
-                        <div className="text-3xl font-black text-blue-600 dark:text-blue-400">{allTasks.filter(t => t.status === "制作中").length}</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">制作中</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-4 text-center">
-                        <div className="text-3xl font-black text-yellow-600 dark:text-yellow-400">{allTasks.filter(t => t.status === "確認中").length}</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">確認中</div>
-                    </CardContent>
-                </Card>
-            </div>
-
             {/* Filters */}
             <Card className="mb-6 shadow-sm">
                 <CardContent className="pt-4">
@@ -225,25 +179,46 @@ export default function Dashboard({
                                     onChange={e => setSearchQuery(e.target.value)}
                                     className="pl-10 dark:bg-zinc-800 dark:text-zinc-100"
                                 />
+                                {isPending && <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-zinc-400" />}
                             </div>
                         </div>
-                        <Select value={filterClient} onChange={e => setFilterClient(e.target.value)} className="dark:bg-zinc-800 dark:text-zinc-100">
+                        <Select
+                            value={searchParams.get("clientId") || ""}
+                            onChange={e => updateFilter("clientId", e.target.value)}
+                            className="dark:bg-zinc-800 dark:text-zinc-100"
+                        >
                             <option value="">クライアント: 全て</option>
                             {initialClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </Select>
-                        <Select value={filterPartner} onChange={e => setFilterPartner(e.target.value)} className="dark:bg-zinc-800 dark:text-zinc-100">
+                        <Select
+                            value={searchParams.get("partnerId") || ""}
+                            onChange={e => updateFilter("partnerId", e.target.value)}
+                            className="dark:bg-zinc-800 dark:text-zinc-100"
+                        >
                             <option value="">パートナー: 全て</option>
                             {initialPartners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </Select>
-                        <Select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="dark:bg-zinc-800 dark:text-zinc-100">
+                        <Select
+                            value={searchParams.get("staffId") || ""}
+                            onChange={e => updateFilter("staffId", e.target.value)}
+                            className="dark:bg-zinc-800 dark:text-zinc-100"
+                        >
+                            <option value="">担当者: 全て</option>
+                            {initialStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </Select>
+                        <Select
+                            value={searchParams.get("status") || ""}
+                            onChange={e => updateFilter("status", e.target.value)}
+                            className="dark:bg-zinc-800 dark:text-zinc-100"
+                        >
                             <option value="">ステータス: 全て</option>
                             {statuses.map(s => <option key={s} value={s}>{s}</option>)}
                         </Select>
                         <div className="flex items-center space-x-2">
                             <Checkbox
                                 id="showCompleted"
-                                checked={showCompleted}
-                                onCheckedChange={(checked) => setShowCompleted(!!checked)}
+                                checked={searchParams.get("showCompleted") === 'true'}
+                                onCheckedChange={(checked) => updateFilter("showCompleted", checked ? 'true' : null)}
                             />
                             <label htmlFor="showCompleted" className="text-sm text-zinc-700 cursor-pointer select-none dark:text-zinc-300">
                                 完了済みも表示
@@ -258,9 +233,8 @@ export default function Dashboard({
                     <div className="flex justify-between items-center">
                         <CardTitle className="text-xl font-bold dark:text-zinc-100">
                             進行管理一覧（タスク単位）
-                            {!showCompleted && !filterStatus && <span className="text-sm font-normal text-zinc-500 ml-2 dark:text-zinc-400">※進行中のみ表示</span>}
                         </CardTitle>
-                        <span className="text-sm text-zinc-500 dark:text-zinc-400">{filteredTasks.length}件</span>
+                        <span className="text-sm text-zinc-500 dark:text-zinc-400">{paginatedTasks.total.toLocaleString()}件 (Page {paginatedTasks.page}/{paginatedTasks.totalPages})</span>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -281,12 +255,12 @@ export default function Dashboard({
                                 </tr>
                             </thead>
                             <tbody className="[&_tr:last-child]:border-0 bg-white dark:bg-zinc-900">
-                                {filteredTasks.length === 0 ? (
+                                {tasks.length === 0 ? (
                                     <tr><td colSpan={10} className="p-8 text-center text-zinc-400 italic dark:text-zinc-500">該当するタスクはありません</td></tr>
-                                ) : filteredTasks.map((task) => {
+                                ) : tasks.map((task) => {
                                     const profit = (task.revenueAmount || 0) - (task.costAmount || 0);
                                     const margin = task.revenueAmount > 0 ? (profit / task.revenueAmount) * 100 : 0;
-                                    const isOverdue = task.deliveryDate && new Date(task.deliveryDate) < new Date() && !['納品済', '請求済', '入金済み'].includes(task.status);
+                                    const isOverdue = task.deliveryDate && task.deliveryDate < new Date() && !['納品済', '請求済', '入金済み', '完了', '失注'].includes(task.status);
 
                                     return (
                                         <tr
@@ -363,6 +337,36 @@ export default function Dashboard({
                             </tbody>
                         </table>
                     </div>
+
+                    {paginatedTasks.totalPages > 1 && (
+                        <div className="flex items-center justify-between px-4 py-4 border-t dark:border-zinc-700">
+                            <div className="flex-1 text-sm text-zinc-500 dark:text-zinc-400">
+                                {paginatedTasks.total} 件中 {(paginatedTasks.page - 1) * 50 + 1} - {Math.min(paginatedTasks.page * 50, paginatedTasks.total)} 件を表示
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => updateFilter("page", (paginatedTasks.page - 1).toString())}
+                                    disabled={paginatedTasks.page <= 1}
+                                    className="dark:bg-zinc-800 dark:border-zinc-700"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                    前へ
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => updateFilter("page", (paginatedTasks.page + 1).toString())}
+                                    disabled={paginatedTasks.page >= paginatedTasks.totalPages}
+                                    className="dark:bg-zinc-800 dark:border-zinc-700"
+                                >
+                                    次へ
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </>
