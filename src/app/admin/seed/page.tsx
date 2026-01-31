@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { seedData } from "@/actions/seed-action";
+import { seedData, seedTestStaff } from "@/actions/seed-action";
 
 export default function SeedPage() {
     const [status, setStatus] = useState("Idle");
@@ -27,6 +27,24 @@ export default function SeedPage() {
                     Run Seed Script
                 </Button>
                 <span>Status: {status}</span>
+            </div>
+
+            <div className="mt-8">
+                <h2 className="text-xl font-bold mb-4">Ad-hoc Tasks</h2>
+                <div className="flex gap-4 items-center">
+                    <Button onClick={async () => {
+                        setStatus("Adding Test Staff...");
+                        try {
+                            await seedTestStaff();
+                            setStatus("Success! Test staff added.");
+                        } catch (e) {
+                            console.error(e);
+                            setStatus("Error adding test staff.");
+                        }
+                    }} disabled={status === "Adding Test Staff..."} variant="secondary">
+                        Add Test Staff (Ops x3, Acc x3)
+                    </Button>
+                </div>
             </div>
         </div>
     );
