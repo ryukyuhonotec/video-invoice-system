@@ -61,6 +61,8 @@ export interface Client {
     partners?: Partner[]; // NEW: Direct Client-Partner links
     contractSigned?: boolean;
     contractUrl?: string;
+    // Computed/Joined fields (often optional)
+    invoices?: Invoice[];
 }
 
 export interface Partner {
@@ -123,9 +125,9 @@ export type Staff = {
     role: "OPERATIONS" | "ACCOUNTING" | "OWNER";
     userId: string | null;
 
-    invoices: Invoice[];
-    opsClients: Client[];
-    accClients: Client[];
+    invoices?: Invoice[];
+    opsClients?: Client[];
+    accClients?: Client[];
 
     createdAt: Date;
     updatedAt: Date;
