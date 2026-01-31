@@ -688,6 +688,7 @@ function StaffDashboardContent() {
                             >
                                 <option value="OPERATIONS">事業統括</option>
                                 <option value="ACCOUNTING">経理</option>
+                                <option value="OWNER">オーナー / 事業統括</option>
                             </Select>
                         </div>
                     </div>
