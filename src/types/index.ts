@@ -114,12 +114,20 @@ export interface Outsource {
     deliveryNote?: string;
 }
 
-export interface Staff {
+export type Staff = {
     id: string;
     name: string;
-    email?: string;
-    role: 'OPERATIONS' | 'ACCOUNTING';
-}
+    email: string | null;
+    role: "OPERATIONS" | "ACCOUNTING" | "OWNER";
+    userId: string | null;
+
+    invoices: Invoice[];
+    opsClients: Client[];
+    accClients: Client[];
+
+    createdAt: Date;
+    updatedAt: Date;
+};
 
 export type InvoiceStatus = 'DRAFT' | 'Unbilled' | 'Billed' | 'Paid' | '請求済' | '入金済み' | '受注前' | '進行中' | '制作中' | '修正中' | '確認中' | '納品済' | '請求書作成済' | '送付済' | '完了' | '失注';
 export type ProductionStatus = '受注前' | '制作中' | '修正中' | '確認中' | '納品済' | '請求済' | '入金済み' | 'Pre-Order' | 'In Progress' | 'Review' | 'Delivered';

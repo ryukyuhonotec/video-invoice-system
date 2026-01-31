@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { getStaff, getClients, getInvoices } from "@/actions/pricing-actions";
 import { createStaffInvitation, getStaffInvitations, deleteInvitation } from "@/actions/invitation-actions";
 import { Staff, Client, Invoice } from "@/types";
-import { Trash2, ShieldCheck, Calculator, Link2, Copy, Building2, TrendingUp, Clock } from "lucide-react";
+import { Trash2, ShieldCheck, Calculator, Link2, Copy, Building2, TrendingUp, Clock, Crown } from "lucide-react";
 
 export default function StaffPage() {
     const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -229,10 +229,12 @@ export default function StaffPage() {
                                     {staffList
                                         .sort((a, b) => {
                                             if (a.role === b.role) return a.name.localeCompare(b.name);
+                                            if (a.role === 'OWNER') return -1;
+                                            if (b.role === 'OWNER') return 1;
                                             return a.role === 'OPERATIONS' ? -1 : 1;
                                         })
                                         .map((s) => {
-                                            const stats = s.role === 'OPERATIONS' ? getStaffStats(s.id) : null;
+                                            const stats = (s.role === 'OPERATIONS' || s.role === 'OWNER') ? getStaffStats(s.id) : null;
                                             return (
                                                 <tr
                                                     key={s.id}
@@ -240,7 +242,11 @@ export default function StaffPage() {
                                                     onClick={() => window.location.href = `/staff-dashboard?staffId=${s.id}`}
                                                 >
                                                     <td className="p-4 align-middle">
-                                                        {s.role === 'OPERATIONS' ? (
+                                                        {s.role === 'OWNER' ? (
+                                                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                                                                <Crown className="h-3 w-3" /> オーナー / 事業統括
+                                                            </span>
+                                                        ) : s.role === 'OPERATIONS' ? (
                                                             <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
                                                                 <ShieldCheck className="h-3 w-3" /> 事業統括
                                                             </span>

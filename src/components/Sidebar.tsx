@@ -31,6 +31,11 @@ const menuItems = [
 export function Sidebar({ version = "0.1.0" }: { version?: string }) {
     const pathname = usePathname();
 
+    // Hide sidebar on login page
+    if (pathname.startsWith("/login") || pathname.startsWith("/invite")) {
+        return null;
+    }
+
     return (
         <aside className="w-64 bg-zinc-900 text-zinc-300 min-h-screen flex flex-col fixed left-0 top-0 bottom-0 z-50">
             <div className="p-6">
